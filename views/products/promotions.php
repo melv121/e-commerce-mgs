@@ -6,7 +6,6 @@
 </div>
 
 <div class="container py-5">
-    
     <div class="row g-4">
         <?php foreach ($products as $product): ?>
             <?php 
@@ -18,7 +17,9 @@
                 <div class="product-card animate-slide-up">
                     <div class="product-badge bg-danger">-<?= $product['discount'] ?>%</div>
                     <div class="product-image">
-                        <img src="<?= $product['image'] ?? '/assets/images/products/default.jpg' ?>" alt="<?= $product['name'] ?? 'Product' ?>">
+                        <!-- Correction pour afficher correctement les images -->
+                        <img src="<?= strpos($product['image'], 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']) ?>" 
+                             alt="<?= $product['name'] ?? 'Product' ?>">
                         <div class="product-overlay">
                             <a href="<?= BASE_URL ?>/product/detail/<?= $product['id'] ?>" class="btn" data-bs-toggle="tooltip" title="Vue rapide">
                                 <i class="fas fa-eye"></i>
@@ -103,7 +104,9 @@
                     <div class="product-card animate-slide-up">
                         <div class="product-badge bg-danger">-<?= $product['discount'] ?>%</div>
                         <div class="product-image">
-                            <img src="<?= $product['image'] ?? '/assets/images/products/default.jpg' ?>" alt="<?= $product['name'] ?? 'Product' ?>">
+                            <!-- Correction pour afficher correctement les images -->
+                            <img src="<?= strpos($product['image'], 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']) ?>" 
+                                 alt="<?= $product['name'] ?? 'Product' ?>">
                             <div class="product-overlay">
                                 <a href="<?= BASE_URL ?>/product/detail/<?= $product['id'] ?>" class="btn" data-bs-toggle="tooltip" title="Vue rapide">
                                     <i class="fas fa-eye"></i>

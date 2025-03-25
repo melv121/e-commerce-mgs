@@ -2,32 +2,41 @@
     <div class="row justify-content-center">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-body p-5">
-                    <h1 class="card-title text-center mb-4">Connexion</h1>
-                    
-                    <?php if (!empty($errors)): ?>
+                <div class="card-header bg-light">
+                    <h4 class="mb-0">Connexion</h4>
+                </div>
+                <div class="card-body">
+                    <?php if(isset($_SESSION['auth_errors'])): ?>
                         <div class="alert alert-danger">
-                            <?php foreach($errors as $error): ?>
-                                <p class="mb-0"><?php echo $error; ?></p>
-                            <?php endforeach; ?>
+                            <ul class="mb-0">
+                                <?php foreach($_SESSION['auth_errors'] as $error): ?>
+                                    <li><?php echo $error; ?></li>
+                                <?php endforeach; ?>
+                            </ul>
                         </div>
+                        <?php unset($_SESSION['auth_errors']); ?>
                     <?php endif; ?>
-
-                    <form method="POST" action="<?php echo BASE_URL; ?>/auth/login">
+                    
+                    <form action="<?php echo BASE_URL; ?>/auth/processLogin" method="post">
                         <div class="mb-3">
-                            <label for="email" class="form-label">Email</label>
+                            <label for="email" class="form-label">Adresse e-mail</label>
                             <input type="email" class="form-control" id="email" name="email" required>
                         </div>
                         <div class="mb-3">
                             <label for="password" class="form-label">Mot de passe</label>
                             <input type="password" class="form-control" id="password" name="password" required>
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">Se connecter</button>
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+                            <label class="form-check-label" for="remember_me">Se souvenir de moi</label>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Se connecter</button>
+                        </div>
                     </form>
-                    
-                    <div class="text-center mt-4">
-                        <p>Pas encore de compte ? <a href="<?php echo BASE_URL; ?>/auth/register">Créer un compte</a></p>
-                    </div>
+                </div>
+                <div class="card-footer bg-light text-center">
+                    <p class="mb-0">Pas encore de compte ? <a href="<?php echo BASE_URL; ?>/auth/register">Inscrivez-vous</a></p>
                 </div>
             </div>
         </div>

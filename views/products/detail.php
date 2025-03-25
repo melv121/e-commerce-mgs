@@ -123,7 +123,9 @@
             <div class="col-lg-3 col-md-6 mb-4">
                 <div class="product-card">
                     <div class="product-image">
-                        <img src="<?php echo $similarProduct['image']; ?>" alt="<?php echo $similarProduct['name']; ?>" class="img-fluid">
+                        <!-- Corriger l'affichage des images -->
+                        <img src="<?php echo strpos($similarProduct['image'], 'http') === 0 ? $similarProduct['image'] : (BASE_URL . '/' . $similarProduct['image']); ?>" 
+                             alt="<?php echo $similarProduct['name']; ?>" class="img-fluid">
                         <div class="product-overlay">
                             <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $similarProduct['id']; ?>" class="btn"><i class="fas fa-eye"></i></a>
                             <a href="#" class="btn add-to-cart-btn" data-product-id="<?php echo $similarProduct['id']; ?>"><i class="fas fa-shopping-cart"></i></a>

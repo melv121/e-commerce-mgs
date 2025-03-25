@@ -121,16 +121,128 @@
                     </li>
                 </ul>
                 <div class="d-flex nav-icons">
-                    <a href="#" class="text-dark me-3"><i class="fas fa-search"></i></a>
-                    <a href="#" class="text-dark me-3"><i class="fas fa-user"></i></a>
+                    <a href="#" class="text-dark me-3" data-bs-toggle="modal" data-bs-target="#searchModal"><i class="fas fa-search"></i></a>
+                    <a href="#" class="text-dark me-3" id="userIcon" data-bs-toggle="modal" data-bs-target="#authModal"><i class="fas fa-user"></i></a>
                     <a href="<?php echo BASE_URL; ?>/cart" class="text-dark position-relative">
                         <i class="fas fa-shopping-cart"></i>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger cart-counter">0</span>
+                        <?php
+                        // Récupérer le nombre d'articles dans le panier
+                        require_once 'controllers/CartController.php';
+                        $cartController = new CartController();
+                        $cartCount = $cartController->getCartItemCount();
+                        ?>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger cart-counter"><?php echo $cartCount; ?></span>
                     </a>
                 </div>
             </div>
         </div>
     </nav>
     
+    <!-- Modal d'authentification -->
+    <div class="modal fade" id="authModal" tabindex="-1" aria-labelledby="authModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title" id="authModalLabel">Mon compte</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-0">
+                    <?php if (isset($_SESSION['user'])): ?>
+                        <!-- Utilisateur connecté -->
+                        <div class="text-center mb-4">
+                            <div class="avatar-circle mx-auto mb-3">
+                                <span class="avatar-initials"><?php echo strtoupper(substr($_SESSION['user']['first_name'] ?? $_SESSION['user']['username'], 0, 1)); ?></span>
+                            </div>
+                            <h5 class="mb-0">Bonjour, <?php echo $_SESSION['user']['first_name'] ?? $_SESSION['user']['username']; ?></h5>
+                            <p class="text-muted"><?php echo $_SESSION['user']['email']; ?></p>
+                        </div>
+                        <div class="list-group list-group-flush">
+                            <a href="<?php echo BASE_URL; ?>/auth/profile" class="list-group-item list-group-item-action">
+                                <i class="fas fa-user-circle me-2"></i> Mon profil
+                            </a>
+                            <a href="<?php echo BASE_URL; ?>/order/history" class="list-group-item list-group-item-action">
+                                <i class="fas fa-shopping-bag me-2"></i> Mes commandes
+                            </a>
+                            <a href="<?php echo BASE_URL; ?>/auth/logout" class="list-group-item list-group-item-action text-danger">
+                                <i class="fas fa-sign-out-alt me-2"></i> Déconnexion
+                            </a>
+                        </div>
+                    <?php else: ?>
+                        <!-- Utilisateur non connecté -->
+                        <ul class="nav nav-tabs mb-4" id="authTab" role="tablist">
+                            <li class="nav-item flex-fill" role="presentation">
+                                <button class="nav-link active w-100" id="login-tab" data-bs-toggle="tab" data-bs-target="#login" type="button" role="tab" aria-controls="login" aria-selected="true">Connexion</button>
+                            </li>
+                            <li class="nav-item flex-fill" role="presentation">
+                                <button class="nav-link w-100" id="register-tab" data-bs-toggle="tab" data-bs-target="#register" type="button" role="tab" aria-controls="register" aria-selected="false">Inscription</button>
+                            </li>
+                        </ul>
+                        <div class="tab-content" id="authTabContent">
+                            <!-- Onglet Connexion -->
+                            <div class="tab-pane fade show active" id="login" role="tabpanel" aria-labelledby="login-tab">
+                                <form id="loginForm" action="<?php echo BASE_URL; ?>/auth/processLogin" method="post">
+                                    <div class="mb-3">
+                                        <label for="loginEmail" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="loginEmail" name="email" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="loginPassword" class="form-label">Mot de passe</label>
+                                        <input type="password" class="form-control" id="loginPassword" name="password" required>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="rememberMe" name="remember_me">
+                                        <label class="form-check-label" for="rememberMe">Se souvenir de moi</label>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary">Se connecter</button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <!-- Onglet Inscription -->
+                            <div class="tab-pane fade" id="register" role="tabpanel" aria-labelledby="register-tab">
+                                <form id="registerForm" action="<?php echo BASE_URL; ?>/auth/processRegister" method="post">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="registerFirstName" class="form-label">Prénom</label>
+                                            <input type="text" class="form-control" id="registerFirstName" name="first_name">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="registerLastName" class="form-label">Nom</label>
+                                            <input type="text" class="form-control" id="registerLastName" name="last_name">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="registerUsername" class="form-label">Nom d'utilisateur*</label>
+                                        <input type="text" class="form-control" id="registerUsername" name="username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="registerEmail" class="form-label">Email*</label>
+                                        <input type="email" class="form-control" id="registerEmail" name="email" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="registerPassword" class="form-label">Mot de passe*</label>
+                                        <input type="password" class="form-control" id="registerPassword" name="password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="registerPasswordConfirm" class="form-label">Confirmer le mot de passe*</label>
+                                        <input type="password" class="form-control" id="registerPasswordConfirm" name="password_confirm" required>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="termsCheck" name="terms" required>
+                                        <label class="form-check-label" for="termsCheck">J'accepte les <a href="#">termes et conditions</a>*</label>
+                                    </div>
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary">S'inscrire</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Contenu principal -->
     <main class="mt-5 pt-4">

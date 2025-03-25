@@ -36,8 +36,6 @@ class CartController {
             }
         } catch (PDOException $e) {
             error_log("Erreur lors de l'initialisation du panier: " . $e->getMessage());
-            // En mode développement, vous pouvez décommenter la ligne suivante
-            // throw $e;
         }
     }
 
@@ -59,7 +57,9 @@ class CartController {
             $this->addToCart($productId, $quantity);
             
             if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-                echo json_encode(['success' => true]);
+                // Obtenir le nombre total d'articles dans le panier
+                $cartCount = $this->getCartItemCount();
+                echo json_encode(['success' => true, 'cartCount' => $cartCount]);
                 exit;
             }
             
@@ -68,7 +68,6 @@ class CartController {
         }
     }
     
-    // Ajouter la méthode manquante pour l'ajout au panier
     private function addToCart($productId, $quantity) {
         try {
             // Vérifier si le produit existe
@@ -125,7 +124,28 @@ class CartController {
         }
     }
 
-    // Ajouter des méthodes pour mettre à jour et supprimer des éléments du panier
+    // Méthode publique pour obtenir le nombre d'articles dans le panier
+    public function getCartItemCount() {
+        try {
+            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
+            $sessionId = session_id();
+            
+            $query = "SELECT SUM(ci.quantity) as total
+                     FROM cart_items ci
+                     JOIN cart c ON ci.cart_id = c.id
+                     WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
+            
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$userId ?? $sessionId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            return (int) ($result['total'] ?? 0);
+        } catch (PDOException $e) {
+            error_log("Erreur lors du calcul du nombre d'articles dans le panier: " . $e->getMessage());
+            return 0;
+        }
+    }
+    
     public function update() {
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $data = json_decode(file_get_contents('php://input'), true);
@@ -181,7 +201,7 @@ class CartController {
         try {
             $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
             $sessionId = session_id();
-
+            
             $query = "SELECT ci.*, p.name, p.price, p.image 
                     FROM cart_items ci
                     JOIN cart c ON ci.cart_id = c.id

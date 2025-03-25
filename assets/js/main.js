@@ -107,7 +107,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        count++;
+                        // Mettre à jour le compteur du panier
+                        count = data.cartCount || (count + 1);
                         cartCounter.textContent = count;
                         
                         // Animation pulsation
@@ -120,7 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         const product = this.closest('.product-card');
                         const productName = product ? product.querySelector('.product-title').textContent : 'Produit';
                         
-                        showToast(`${productName} ajouté au panier`);
+                        // Afficher la mini-notification
+                        showCartNotification(productName, count);
                     }
                 })
                 .catch(error => {
@@ -128,6 +130,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             });
         });
+    }
+    
+    // Fonction pour afficher une mini-notification d'ajout au panier
+    function showCartNotification(productName, count) {
+        // Vérifier si une notification existe déjà
+        let notification = document.querySelector('.cart-notification');
+        
+        // Si elle n'existe pas encore, la créer
+        if (!notification) {
+            notification = document.createElement('div');
+            notification.className = 'cart-notification';
+            document.body.appendChild(notification);
+        }
+        
+        // Mettre à jour le contenu de la notification
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="notification-text">
+                    <p><strong>${productName}</strong> ajouté au panier</p>
+                    <p class="cart-count-text"><i class="fas fa-shopping-cart"></i> ${count} article${count > 1 ? 's' : ''} dans votre panier</p>
+                </div>
+            </div>
+            <div class="notification-actions">
+                <a href="${BASE_URL}/cart" class="btn btn-sm btn-primary">Voir le panier</a>
+                <button class="btn btn-sm btn-outline-secondary notification-close">Continuer</button>
+            </div>
+        `;
+        
+        // Ajouter la classe active pour afficher la notification
+        notification.classList.add('active');
+        
+        // Ajouter un gestionnaire d'événements pour le bouton de fermeture
+        const closeButton = notification.querySelector('.notification-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', function() {
+                notification.classList.remove('active');
+            });
+        }
+        
+        // Masquer automatiquement la notification après 5 secondes
+        setTimeout(() => {
+            notification.classList.remove('active');
+        }, 5000);
     }
     
     // Créer une fonction pour afficher des notifications toast
@@ -264,6 +312,50 @@ document.addEventListener('DOMContentLoaded', function() {
     lazyImages.forEach(img => {
         imageObserver.observe(img);
     });
+    
+    // Animation des icônes améliorée
+    const navIcons = document.querySelectorAll('.nav-icons a');
+    
+    navIcons.forEach(icon => {
+        icon.addEventListener('mouseenter', function() {
+            const iconElement = this.querySelector('i');
+            if (iconElement) {
+                iconElement.classList.add('fa-beat');
+                setTimeout(() => {
+                    iconElement.classList.remove('fa-beat');
+                }, 800);
+            }
+        });
+    });
+    
+    // Animation pour les icônes des fonctionnalités (features)
+    const featureIcons = document.querySelectorAll('.feature-icon');
+    
+    featureIcons.forEach(icon => {
+        icon.parentElement.addEventListener('mouseenter', function() {
+            icon.style.animation = "bounceIn 0.8s ease";
+            icon.style.color = "#ff3333";
+            setTimeout(() => {
+                icon.style.animation = "";
+                icon.style.color = "#ff0000";
+            }, 800);
+        });
+    });
+    
+    // Animation pour les icônes sociales du footer
+    const socialIcons = document.querySelectorAll('.social-icon');
+    
+    socialIcons.forEach(icon => {
+        icon.addEventListener('mouseenter', function() {
+            const iconElement = this.querySelector('i');
+            if (iconElement) {
+                iconElement.classList.add('fa-bounce');
+                setTimeout(() => {
+                    iconElement.classList.remove('fa-bounce');
+                }, 1000);
+            }
+        });
+    });
 });
 
 // Fonction pour charger plus de produits (simulée)
@@ -342,3 +434,17 @@ function filterProducts(category) {
         }
     });
 }
+
+// Ajout d'une animation CSS pour l'effet de rebond
+document.head.insertAdjacentHTML('beforeend', `
+<style>
+@keyframes bounceIn {
+    0% { transform: scale(1); }
+    20% { transform: scale(1.3); }
+    40% { transform: scale(0.9); }
+    60% { transform: scale(1.2); }
+    80% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+</style>
+`);

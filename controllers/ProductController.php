@@ -282,17 +282,31 @@ class ProductController {
     }
     
     private function getSimilarProducts($categoryId, $excludeId) {
-        // Cette fonction récupérerait normalement des produits similaires depuis la base de données
-        // Pour l'instant, on renvoie quelques produits fictifs
-        
-        $products = $this->getProductsByCategoryAndSubcategory(null, null);
-        
-        // Filtrer pour exclure le produit actuel et limiter à 4 produits
-        $similarProducts = array_filter($products, function($product) use ($excludeId) {
-            return $product['id'] != $excludeId;
-        });
-        
-        return array_slice($similarProducts, 0, 4);
+        try {
+            $query = "SELECT p.*, c.name as category_name 
+                      FROM products p
+                      LEFT JOIN categories c ON p.category_id = c.id
+                      WHERE p.category_id = ? AND p.id != ?
+                      ORDER BY RAND() 
+                      LIMIT 4";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$categoryId, $excludeId]);
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // S'assurer que chaque produit a une image appropriée et d'autres attributs nécessaires
+            foreach ($products as &$product) {
+                if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
+                    $product['image'] = $this->getProductImageByType($product['name'], $product['category_name']);
+                }
+                $product['rating'] = rand(3, 5);
+                $product['brand'] = $this->extractBrandFromName($product['name']);
+            }
+            
+            return $products;
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des produits similaires: " . $e->getMessage());
+            return [];
+        }
     }
 
     private function getNewProducts() {
@@ -300,8 +314,25 @@ class ProductController {
             $query = "SELECT * FROM products WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) ORDER BY created_at DESC";
             $stmt = $this->db->prepare($query);
             $stmt->execute();
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Ajouter des informations supplémentaires à chaque produit
+            foreach ($products as &$product) {
+                // S'assurer que l'image est valide
+                if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
+                    $product['image'] = $this->getProductImageByType($product['name'], $product['category_name'] ?? null);
+                }
+                
+                // Ajouter une note aléatoire
+                $product['rating'] = $product['rating'] ?? rand(3, 5);
+                
+                // Ajouter la marque extraite du nom du produit
+                $product['brand'] = $this->extractBrandFromName($product['name']);
+            }
+            
+            return $products;
         } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des nouveaux produits: " . $e->getMessage());
             return [];
         }
     }
