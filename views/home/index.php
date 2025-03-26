@@ -301,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="collection-feature-content">
                         <h3 class="collection-feature-title">HOMME</h3>
                         <p>Les essentiels d'entraînement</p>
-                        <a href="#" class="btn-feature-link">ACHETEZ MAINTENANT <i class="fas fa-arrow-right"></i></a>
+                        <a href="<?php echo BASE_URL; ?>/product/category/homme" class="btn-feature-link">ACHETEZ MAINTENANT <i class="fas fa-arrow-right"></i></a>
                     </div>
                 </div>
             </div>
@@ -311,7 +311,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="collection-feature-content">
                         <h3 class="collection-feature-title">FEMME</h3>
                         <p>Mode et performance</p>
-                        <a href="#" class="btn-feature-link">ACHETEZ MAINTENANT <i class="fas fa-arrow-right"></i></a>
+                        <a href="<?php echo BASE_URL; ?>/product/category/femme" class="btn-feature-link">ACHETEZ MAINTENANT <i class="fas fa-arrow-right"></i></a>
                     </div>
                 </div>
             </div>
@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="video-content">
         <h2 class="video-title">ENTRAÎNE-TOi COMME UN PRO</h2>
         <p class="video-text">Découvre notre gamme d'équipements techniques conçus pour optimiser tes performances</p>
-        <a href="#" class="btn btn-primary btn-lg">DÉCOUVRIR</a>
+        <a href="<?php echo BASE_URL; ?>/product/nouveautes" class="btn btn-primary btn-lg">DÉCOUVRIR</a>
     </div>
 </section>
 

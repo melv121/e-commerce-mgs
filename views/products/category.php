@@ -74,39 +74,17 @@
                 </div>
                 
                 <div class="row g-4">
-                    <?php foreach($products as $product): ?>
-                    <div class="col-md-4">
-                        <div class="product-card">
-                            <?php if(isset($product['sale']) && $product['sale']): ?>
-                            <div class="product-badge">Promo</div>
-                            <?php endif; ?>
-                            <div class="product-image">
-                                <img src="<?php echo BASE_URL . '/' . $product['image']; ?>" alt="<?php echo $product['name']; ?>" class="img-fluid">
-                                <div class="product-overlay">
-                                    <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $product['id']; ?>" class="btn"><i class="fas fa-eye"></i></a>
-                                    <a href="#" class="btn add-to-cart-btn"><i class="fas fa-shopping-cart"></i></a>
-                                    <a href="#" class="btn"><i class="fas fa-heart"></i></a>
-                                </div>
-                            </div>
-                            <div class="product-info p-3">
-                                <p class="product-category"><?php echo ucfirst($product['brand']); ?></p>
-                                <h5 class="product-title"><?php echo $product['name']; ?></h5>
-                                <div class="product-rating">
-                                    <?php for($i = 1; $i <= 5; $i++): ?>
-                                        <?php if($i <= $product['rating']): ?>
-                                            <i class="fas fa-star"></i>
-                                        <?php elseif($i - 0.5 <= $product['rating']): ?>
-                                            <i class="fas fa-star-half-alt"></i>
-                                        <?php else: ?>
-                                            <i class="far fa-star"></i>
-                                        <?php endif; ?>
-                                    <?php endfor; ?>
-                                </div>
-                                <p class="product-price"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</p>
+                    <?php if (empty($products)): ?>
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                Aucun produit trouvé dans cette catégorie.
                             </div>
                         </div>
-                    </div>
-                    <?php endforeach; ?>
+                    <?php else: ?>
+                        <?php foreach($products as $product): ?>
+                            <?php include __DIR__ . '/../partials/product-card.php'; ?>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>

@@ -1,0 +1,151 @@
+/**
+ * Thème de couleurs personnalisé pour MGS Store
+ * Rouge plus éclatant et noir plus profond
+ */
+
+:root {
+    --mgs-red: #ff0000;         /* Rouge principal vif */
+    --mgs-red-dark: #cc0000;    /* Rouge foncé */
+    --mgs-red-light: #ff3333;   /* Rouge clair */
+    --mgs-black: #121212;       /* Noir profond */
+    --mgs-dark-gray: #2a2a2a;   /* Gris foncé */
+    --mgs-mid-gray: #6c757d;    /* Gris moyen */
+    --mgs-light-gray: #f8f9fa;  /* Gris clair */
+}
+
+/* Couleurs de texte spécifiques */
+.text-mgs-red {
+    color: var(--mgs-red) !important;
+}
+
+.text-mgs-black {
+    color: var(--mgs-black) !important;
+}
+
+/* Logo MGS dans la navbar */
+.navbar-brand .text-mgs-black {
+    color: var(--mgs-black);
+    font-weight: 800;
+}
+
+/* Logo MGS dans le footer */
+footer .footer-logo .text-mgs-black {
+    color: white; /* Pour une meilleure visibilité dans le fond sombre */
+}
+
+/* Couleurs de fond */
+.bg-mgs-red {
+    background-color: var(--mgs-red) !important;
+    color: white;
+}
+
+.bg-mgs-black {
+    background-color: var(--mgs-black) !important;
+    color: white;
+}
+
+.bg-mgs-dark-gray {
+    background-color: var(--mgs-dark-gray) !important;
+    color: white;
+}
+
+.bg-mgs-light-gray {
+    background-color: var(--mgs-light-gray) !important;
+    color: var(--mgs-black);
+}
+
+/* Boutons personnalisés */
+.btn-mgs-red {
+    background-color: var(--mgs-red);
+    border-color: var(--mgs-red);
+    color: white;
+}
+
+.btn-mgs-red:hover, .btn-mgs-red:focus {
+    background-color: var(--mgs-red-dark);
+    border-color: var(--mgs-red-dark);
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.btn-mgs-black {
+    background-color: var(--mgs-black);
+    border-color: var(--mgs-black);
+    color: white;
+}
+
+.btn-mgs-black:hover, .btn-mgs-black:focus {
+    background-color: var(--mgs-dark-gray);
+    border-color: var(--mgs-dark-gray);
+    color: white;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+.btn-outline-mgs-red {
+    background-color: transparent;
+    border-color: var(--mgs-red);
+    color: var(--mgs-red);
+}
+
+.btn-outline-mgs-red:hover, .btn-outline-mgs-red:focus {
+    background-color: var(--mgs-red);
+    color: white;
+    box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+    transform: translateY(-2px);
+}
+
+/* Bordures */
+.border-mgs-red {
+    border-color: var(--mgs-red) !important;
+}
+
+.border-mgs-black {
+    border-color: var(--mgs-black) !important;
+}
+
+/* Surbrillance */
+.highlight-mgs-red {
+    position: relative;
+}
+
+.highlight-mgs-red::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    width: 100%;
+    height: 2px;
+    background-color: var(--mgs-red);
+    transform: scaleX(0);
+    transform-origin: right;
+    transition: transform 0.3s ease;
+}
+
+.highlight-mgs-red:hover::after {
+    transform: scaleX(1);
+    transform-origin: left;
+}
+
+/* Éléments interactifs */
+.interactive-icon {
+    color: var(--mgs-black);
+    transition: all 0.3s ease;
+}
+
+.interactive-icon:hover {
+    color: var(--mgs-red);
+    transform: translateY(-3px);
+}
+
+/* Badge et étiquettes */
+.badge-mgs-red {
+    background-color: var(--mgs-red);
+    color: white;
+}
+
+.badge-mgs-black {
+    background-color: var(--mgs-black);
+    color: white;
+}

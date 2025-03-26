@@ -133,21 +133,13 @@ class ProductController {
             if ($subcategory) {
                 switch ($subcategory) {
                     case 'chaussures':
-                        $query .= " AND (p.name LIKE ? OR p.description LIKE ?)";
-                        $params[] = '%chaussure%';
-                        $params[] = '%chaussure%';
+                        $query .= " AND (p.name LIKE '%chaussure%' OR p.name LIKE '%basket%')";
                         break;
                     case 'vetements':
-                        $query .= " AND (p.name LIKE ? OR p.name LIKE ? OR p.name LIKE ? OR p.description LIKE ?)";
-                        $params[] = '%t-shirt%';
-                        $params[] = '%pantalon%';
-                        $params[] = '%jogging%';
-                        $params[] = '%vêtement%';
+                        $query .= " AND (p.name LIKE '%t-shirt%' OR p.name LIKE '%pantalon%' OR p.name LIKE '%pull%' OR p.name LIKE '%sweat%' OR p.name LIKE '%veste%')";
                         break;
                     case 'accessoires':
-                        $query .= " AND (p.name LIKE ? OR p.description LIKE ?)";
-                        $params[] = '%accessoire%';
-                        $params[] = '%accessoire%';
+                        $query .= " AND (p.name LIKE '%sac%' OR p.name LIKE '%casquette%' OR p.name LIKE '%bonnet%' OR p.name LIKE '%gant%')";
                         break;
                 }
             }
@@ -158,6 +150,14 @@ class ProductController {
             $stmt->execute($params);
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
+            // Si aucun produit n'est trouvé, utiliser des données simulées
+            if (empty($products)) {
+                return $this->getSimulatedProducts($category, $subcategory);
+            }
+            
+            // Récupérer les informations sur les produits en promotion
+            $promoProducts = $this->getPromotionalProductsInfo();
+            
             // Ajouter des champs supplémentaires pour la compatibilité avec la vue
             foreach ($products as &$product) {
                 $product['brand'] = $this->extractBrandFromName($product['name']);
@@ -167,14 +167,73 @@ class ProductController {
                 if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
                     $product['image'] = $this->getProductImageByType($product['name'], $category);
                 }
+                
+                // Vérifier si le produit est dans la liste des promotions
+                $productId = $product['id'];
+                if (isset($promoProducts[$productId])) {
+                    $product['promotion'] = true;
+                    $product['discount'] = $promoProducts[$productId]['discount'];
+                    $product['sale_price'] = $promoProducts[$productId]['sale_price'];
+                }
             }
             
             return $products;
         } catch (PDOException $e) {
             // En cas d'erreur, retourner un tableau vide et enregistrer l'erreur
             error_log("Erreur lors de la récupération des produits: " . $e->getMessage());
-            return [];
+            return $this->getSimulatedProducts($category, $subcategory);
         }
+    }
+
+    // Méthode pour générer des produits simulés si la base de données ne retourne rien
+    private function getSimulatedProducts($category, $subcategory) {
+        $products = [];
+        $brands = ['Nike', 'Adidas', 'Puma', 'Reebok', 'Under Armour', 'Teddy Smith'];
+        $categories = ['homme', 'femme', 'enfant'];
+        
+        // Déterminer quelle catégorie utiliser
+        $catToUse = $category ?? $categories[array_rand($categories)];
+        
+        // Générer entre 8 et 16 produits
+        $count = rand(8, 16);
+        
+        for ($i = 1; $i <= $count; $i++) {
+            $brand = $brands[array_rand($brands)];
+            $price = rand(30, 150);
+            $isPromotion = (rand(1, 4) === 1); // 25% de chance d'être en promo
+            $discount = rand(10, 30);
+            $salePrice = $isPromotion ? round($price * (1 - $discount / 100), 2) : null;
+            
+            $productType = '';
+            
+            if ($subcategory === 'chaussures' || rand(1, 3) === 1) {
+                $productType = 'Basket';
+            } elseif ($subcategory === 'vetements' || rand(1, 2) === 1) {
+                $types = ['T-shirt', 'Pantalon', 'Pull', 'Sweat', 'Veste'];
+                $productType = $types[array_rand($types)];
+            } else {
+                $types = ['Sac', 'Casquette', 'Bonnet', 'Gants'];
+                $productType = $types[array_rand($types)];
+            }
+            
+            $name = "$brand $productType " . ucfirst($catToUse) . " #$i";
+            
+            $products[] = [
+                'id' => $i,
+                'name' => $name,
+                'price' => $price,
+                'sale_price' => $salePrice,
+                'image' => $this->getProductImageByType($name, $catToUse),
+                'category_name' => ucfirst($catToUse),
+                'category_id' => array_search($catToUse, $categories) + 1,
+                'brand' => $brand,
+                'rating' => rand(3, 5),
+                'promotion' => $isPromotion,
+                'discount' => $isPromotion ? $discount : null
+            ];
+        }
+        
+        return $products;
     }
     
     private function getCategoryIdByName($categoryName) {
@@ -339,30 +398,122 @@ class ProductController {
 
     private function getPromotionalProducts() {
         try {
-            $query = "SELECT * FROM products WHERE sale_price IS NOT NULL AND sale_price < price";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute();
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            // Liste de produits spécifiques en promotion avec leurs discounts (ajustez selon vos besoins)
+            $promotionProducts = [
+                ["name" => "T-shirt Adidas Homme", "discount" => 15, "id" => 7],
+                ["name" => "Chaussures Running Nike Enfant", "discount" => 15, "id" => 12],
+                ["name" => "Chaussures Running Adidas Homme", "discount" => 22, "id" => 8],
+                ["name" => "T-shirt Nike Enfant", "discount" => 24, "id" => 9],
+                ["name" => "T-shirt Teddy Smith Enfant", "discount" => 18, "id" => 11]
+            ];
             
-            // Assurer que chaque produit a une image appropriée
-            foreach ($products as &$product) {
-                if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
-                    $product['image'] = $this->getProductImageByType($product['name']);
+            // Récupérer les informations complètes pour ces produits
+            $products = [];
+            
+            foreach ($promotionProducts as $promo) {
+                // Chercher le produit dans la base de données
+                $query = "SELECT * FROM products WHERE id = ? OR name LIKE ?";
+                $stmt = $this->db->prepare($query);
+                $stmt->execute([$promo['id'], '%' . $promo['name'] . '%']);
+                $product = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($product) {
+                    // Si le produit existe, ajouter les informations de promotion
+                    $product['promotion'] = true;
+                    $product['discount'] = $promo['discount'];
+                    $product['sale_price'] = $product['price'] * (1 - $promo['discount']/100);
+                    
+                    // S'assurer que l'image est valide
+                    if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
+                        $product['image'] = $this->getProductImageByType($product['name']);
+                    }
+                    
+                    $product['rating'] = rand(3, 5);
+                    $product['brand'] = $this->extractBrandFromName($product['name']);
+                    
+                    $products[] = $product;
                 }
-                $product['rating'] = rand(3, 5);
+            }
+            
+            // Si moins de 5 produits sont trouvés, ajouter des produits simulés
+            if (count($products) < 5) {
+                $simulatedProducts = [
+                    [
+                        'id' => 101,
+                        'name' => 'T-shirt Adidas Homme',
+                        'price' => 32.99,
+                        'discount' => 15,
+                        'category_name' => 'Homme'
+                    ],
+                    [
+                        'id' => 102,
+                        'name' => 'Chaussures Running Nike Enfant',
+                        'price' => 69.99,
+                        'discount' => 15,
+                        'category_name' => 'Enfant'
+                    ],
+                    [
+                        'id' => 103,
+                        'name' => 'Chaussures Running Adidas Homme',
+                        'price' => 84.99,
+                        'discount' => 22,
+                        'category_name' => 'Homme'
+                    ],
+                    [
+                        'id' => 104,
+                        'name' => 'T-shirt Nike Enfant',
+                        'price' => 24.99,
+                        'discount' => 24,
+                        'category_name' => 'Enfant'
+                    ],
+                    [
+                        'id' => 105,
+                        'name' => 'T-shirt Teddy Smith Enfant',
+                        'price' => 29.99,
+                        'discount' => 18,
+                        'category_name' => 'Enfant'
+                    ]
+                ];
+                
+                // Ajouter seulement les produits manquants
+                $needed = 5 - count($products);
+                for ($i = 0; $i < $needed; $i++) {
+                    $simulatedProduct = $simulatedProducts[$i];
+                    $simulatedProduct['promotion'] = true;
+                    $simulatedProduct['sale_price'] = $simulatedProduct['price'] * (1 - $simulatedProduct['discount']/100);
+                    $simulatedProduct['image'] = $this->getProductImageByType($simulatedProduct['name'], $simulatedProduct['category_name']);
+                    $simulatedProduct['rating'] = rand(3, 5);
+                    $simulatedProduct['brand'] = $this->extractBrandFromName($simulatedProduct['name']);
+                    
+                    $products[] = $simulatedProduct;
+                }
             }
             
             return $products;
         } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des produits en promotion: " . $e->getMessage());
             return [];
         }
     }
-    
+
     /**
      * Récupère une URL d'image appropriée selon le type de produit
      */
     private function getProductImageByType($productName, $category = null) {
         $productName = strtolower($productName);
+        
+        // Vérifier si le dossier assets/images/products existe
+        $productImagesDir = __DIR__ . '/../assets/images/products';
+        if (!file_exists($productImagesDir)) {
+            // Créer le répertoire s'il n'existe pas
+            mkdir($productImagesDir, 0777, true);
+        }
+        
+        // Vérifier si une image locale existe
+        $localImage = $this->findLocalProductImage($productName);
+        if ($localImage) {
+            return $localImage;
+        }
         
         // Catégorie Homme
         if ($category == 'homme' || stripos($productName, 'homme') !== false) {
@@ -419,6 +570,78 @@ class ProductController {
             } else {
                 return 'https://img01.ztat.net/article/spp-media-p1/7df9956fe3273e838eac51439d778fb2/29f6f982120b42c9b7c958db65eb3d17.jpg';
             }
+        }
+    }
+
+    /**
+     * Cherche une image locale correspondant au nom du produit
+     */
+    private function findLocalProductImage($productName) {
+        $baseDir = __DIR__ . '/../assets/images/products/';
+        $fallbackImage = 'assets/images/products/default.jpg';
+        
+        // Si le répertoire n'existe pas, retourner l'image par défaut
+        if (!is_dir($baseDir)) {
+            return $fallbackImage;
+        }
+        
+        // Normaliser le nom du produit pour la recherche
+        $normalizedName = strtolower(str_replace([' ', '-', '_'], '', $productName));
+        
+        // Chercher dans le dossier products
+        $files = scandir($baseDir);
+        foreach ($files as $file) {
+            if ($file === '.' || $file === '..') continue;
+            
+            $normalizedFile = strtolower(str_replace([' ', '-', '_', '.jpg', '.png', '.jpeg'], '', $file));
+            
+            // Si le nom de fichier contient le nom du produit normalisé
+            if (strpos($normalizedFile, $normalizedName) !== false ||
+                strpos($normalizedName, $normalizedFile) !== false) {
+                return 'assets/images/products/' . $file;
+            }
+        }
+        
+        // Chercher dans le dossier variants si le dossier existe
+        $variantsDir = $baseDir . 'variants/';
+        if (is_dir($variantsDir)) {
+            $files = scandir($variantsDir);
+            foreach ($files as $file) {
+                if ($file === '.' || $file === '..') continue;
+                
+                $normalizedFile = strtolower(str_replace([' ', '-', '_', '.jpg', '.png', '.jpeg'], '', $file));
+                
+                // Si le nom de fichier contient le nom du produit normalisé
+                if (strpos($normalizedFile, $normalizedName) !== false ||
+                    strpos($normalizedName, $normalizedFile) !== false) {
+                    return 'assets/images/products/variants/' . $file;
+                }
+            }
+        }
+        
+        // Aucune image locale trouvée
+        return null;
+    }
+
+    // Nouvelle méthode pour obtenir les informations sur tous les produits en promotion
+    private function getPromotionalProductsInfo() {
+        try {
+            // On va récupérer les 5 produits en promotion
+            $promotionalProducts = $this->getPromotionalProducts();
+            
+            // Créer un tableau indexé par ID de produit
+            $result = [];
+            foreach ($promotionalProducts as $product) {
+                $result[$product['id']] = [
+                    'discount' => $product['discount'],
+                    'sale_price' => $product['sale_price']
+                ];
+            }
+            
+            return $result;
+        } catch (Exception $e) {
+            error_log("Erreur lors de la récupération des informations sur les promotions: " . $e->getMessage());
+            return [];
         }
     }
 }

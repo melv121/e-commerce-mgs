@@ -12,7 +12,11 @@
             <div class="product-gallery">
                 <div class="main-image mb-3">
                     <!-- Correction pour afficher correctement l'image même sans variantes -->
-                    <img src="<?php echo strpos($product['image'], 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']); ?>" id="main-product-image" class="img-fluid" alt="<?php echo $product['name']; ?>">
+                    <img src="<?php echo strpos($product['image'] ?? '', 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']); ?>" 
+                         id="main-product-image" 
+                         class="img-fluid" 
+                         alt="<?php echo $product['name']; ?>"
+                         onerror="this.onerror=null; this.src='<?php echo BASE_URL; ?>/assets/images/products/default.jpg';">
                 </div>
                 
                 <?php if (!empty($product['variants'])): ?>
@@ -35,6 +39,9 @@
         <div class="col-md-6">
             <div class="product-details">
                 <h1 class="mb-2"><?php echo $product['name']; ?></h1>
+                <?php if (isset($product['promotion']) && $product['promotion']): ?>
+                    <div class="product-badge-detail bg-danger mb-3">-<?= $product['discount'] ?? 20 ?>%</div>
+                <?php endif; ?>
                 <div class="product-meta mb-3">
                     <span class="product-brand"><?php echo ucfirst($product['brand']); ?></span>
                     <span class="product-rating">
@@ -52,9 +59,11 @@
                 </div>
                 
                 <div class="product-price mb-4">
-                    <span class="current-price"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</span>
-                    <?php if(isset($product['sale_price']) && $product['sale_price'] > 0): ?>
-                    <span class="old-price text-muted"><?php echo number_format($product['sale_price'], 2, ',', ' '); ?> €</span>
+                    <?php if (isset($product['promotion']) && $product['promotion']): ?>
+                        <span class="current-price text-danger"><?php echo number_format(($product['price'] * (1 - ($product['discount'] ?? 20)/100)), 2, ',', ' '); ?> €</span>
+                        <span class="old-price text-muted text-decoration-line-through"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</span>
+                    <?php else: ?>
+                        <span class="current-price"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</span>
                     <?php endif; ?>
                 </div>
 

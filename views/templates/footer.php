@@ -5,7 +5,7 @@
         <div class="container py-5">
             <div class="row">
                 <div class="col-lg-3 col-md-6 mb-4 mb-md-0">
-                    <div class="footer-logo"><span class="text-danger">MGS</span> SPORT</div>
+                    <div class="footer-logo"><span class="text-mgs-black">MGS</span></div>
                     <p class="footer-text">Votre destination sportive préférée avec des collections tendance et performantes</p>
                     <div class="footer-social">
                         <a href="#" class="social-icon" title="Facebook">

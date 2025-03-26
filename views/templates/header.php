@@ -16,8 +16,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <!-- AOS Animation Library -->
     <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <!-- Custom Color Theme -->
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/color-theme.css?v=<?php echo time(); ?>">
     <!-- Custom CSS with version parameter to prevent caching -->
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>">
+    <!-- Auth Styles -->
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/auth-style.css?v=<?php echo time(); ?>">
     <!-- Ajout de la variable globale BASE_URL pour JavaScript -->
     <script>
         const BASE_URL = '<?php echo BASE_URL; ?>';
@@ -43,7 +47,7 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-white fixed-top">
         <div class="container">
             <a class="navbar-brand" href="<?php echo BASE_URL; ?>">
-                <span class="text-danger">MGS</span> 
+                <img src="<?php echo BASE_URL; ?>/assets/images/logomgs.png" alt="MGS Logo" height="40">
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
                 <span class="navbar-toggler-icon"></span>

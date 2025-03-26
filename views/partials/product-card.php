@@ -3,11 +3,13 @@
         <?php if (isset($product['new']) && $product['new']): ?>
             <span class="product-badge bg-success">Nouveau</span>
         <?php elseif (isset($product['promotion']) && $product['promotion']): ?>
-            <span class="product-badge bg-danger">-<?= $product['discount'] ?>%</span>
+            <span class="product-badge bg-danger">-<?= $product['discount'] ?? 20 ?>%</span>
         <?php endif; ?>
         
         <div class="product-image">
-            <img src="<?= $product['image'] ?? '/assets/images/products/default.jpg' ?>" alt="<?= $product['name'] ?? 'Product' ?>">
+            <img src="<?= strpos($product['image'] ?? '', 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']) ?>" 
+                 alt="<?= $product['name'] ?? 'Product' ?>" 
+                 onerror="this.onerror=null; this.src='<?= BASE_URL ?>/assets/images/products/default.jpg';">
             <div class="product-overlay">
                 <a href="<?= BASE_URL ?>/product/detail/<?= $product['id'] ?>" class="btn" data-bs-toggle="tooltip" title="Vue rapide">
                     <i class="fas fa-eye"></i>
@@ -22,8 +24,8 @@
         </div>
         
         <div class="product-info">
-            <span class="product-category"><?= $product['category'] ?? $product['category_name'] ?? 'Catégorie' ?></span>
-            <h3 class="product-title"><?= $product['name'] ?? 'Nom du produit' ?></h3>
+            <span class="product-category"><?= isset($product['category_name']) ? htmlspecialchars($product['category_name']) : 'Catégorie' ?></span>
+            <h3 class="product-title"><?= htmlspecialchars($product['name'] ?? 'Nom du produit') ?></h3>
             <div class="product-rating">
                 <?php for($i = 0; $i < 5; $i++): ?>
                     <i class="fas fa-star<?= ($i < ($product['rating'] ?? 0)) ? '' : '-o' ?>"></i>
@@ -35,7 +37,13 @@
                         <?= number_format($product['price'] ?? 0, 2, ',', ' ') ?> €
                     </span>
                     <span class="text-danger">
-                        <?= number_format(($product['price'] * (1 - $product['discount']/100)), 2, ',', ' ') ?> €
+                        <?php 
+                        // Calculer le prix en promotion
+                        $salePrice = isset($product['sale_price']) 
+                            ? $product['sale_price'] 
+                            : ($product['price'] * (1 - ($product['discount'] ?? 20)/100));
+                        echo number_format($salePrice, 2, ',', ' '); 
+                        ?> €
                     </span>
                 </p>
             <?php else: ?>

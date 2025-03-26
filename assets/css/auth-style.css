@@ -3,7 +3,7 @@
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    background-color: #ff0000;
+    background-color: #ff0000; /* Rouge vif */
     color: #fff;
     display: flex;
     align-items: center;
@@ -23,13 +23,13 @@
 }
 
 #authModal .nav-link.active {
-    color: #ff0000;
+    color: #ff0000; /* Rouge vif */
     background-color: transparent;
     border-bottom: 2px solid #ff0000;
 }
 
 #authModal .btn-primary {
-    background-color: #ff0000;
+    background-color: #ff0000; /* Rouge vif */
     border: none;
     width: 100%;
     padding: 12px;
@@ -39,7 +39,8 @@
 }
 
 #authModal .btn-primary:hover {
-    background-color: #e60000;
+    background-color: #121212; /* Noir profond */
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
 #authModal .form-control {
@@ -108,7 +109,7 @@
 }
 
 .profile-sidebar .list-group-item.active {
-    background-color: #ff0000;
+    background-color: #ff0000; /* Rouge vif */
     border-color: #ff0000;
 }
 
@@ -119,7 +120,7 @@
 }
 
 .btn-outline-primary {
-    color: #ff0000;
+    color: #ff0000; /* Rouge vif */
     border-color: #ff0000;
 }
 
