@@ -28,9 +28,21 @@
                     <h5 class="mb-0">Mes factures</h5>
                 </div>
                 <div class="card-body">
+                    <?php if (isset($hasOrdersWithoutInvoices) && $hasOrdersWithoutInvoices): ?>
+                        <div class="alert alert-info">
+                            <p><i class="fas fa-info-circle me-2"></i> Certaines de vos commandes n'ont pas encore de facture associée.</p>
+                            <a href="<?php echo BASE_URL; ?>/repair-invoices.php" class="btn btn-sm btn-primary mt-2">
+                                <i class="fas fa-sync-alt me-2"></i> Générer les factures manquantes
+                            </a>
+                        </div>
+                    <?php endif; ?>
+                    
                     <?php if (empty($invoices)): ?>
                         <div class="alert alert-info">
                             Vous n'avez pas encore de factures.
+                            <?php if (isset($hasOrdersWithoutInvoices) && $hasOrdersWithoutInvoices): ?>
+                                <p class="mt-2">Utilisez le bouton ci-dessus pour générer les factures pour vos commandes existantes.</p>
+                            <?php endif; ?>
                         </div>
                     <?php else: ?>
                         <div class="table-responsive">

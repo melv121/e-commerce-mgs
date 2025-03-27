@@ -148,10 +148,14 @@ class CheckoutController {
                 $stmt->execute([$item['quantity'], $item['id']]);
             }
             
-            // Créer la facture
+            // Créer la facture automatiquement
             require_once 'controllers/InvoiceController.php';
             $invoiceController = new InvoiceController();
-            $invoiceController->generate($orderId);
+            $invoiceResult = $invoiceController->generate($orderId);
+            
+            if (!$invoiceResult) {
+                error_log("Échec de la génération automatique de la facture pour la commande #$orderId");
+            }
             
             // Vider le panier
             $_SESSION['cart'] = [];

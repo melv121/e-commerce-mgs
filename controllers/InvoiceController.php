@@ -16,6 +16,10 @@ class InvoiceController {
             exit;
         }
         
+        // Vérifier s'il y a des commandes sans facture
+        $ordersWithoutInvoices = $this->getOrdersWithoutInvoices($_SESSION['user']['id']);
+        $hasOrdersWithoutInvoices = !empty($ordersWithoutInvoices);
+        
         $invoices = $this->getUserInvoices($_SESSION['user']['id']);
         $pageTitle = "Mes factures";
         
@@ -182,6 +186,21 @@ class InvoiceController {
         } catch (PDOException $e) {
             error_log("Erreur lors de la vérification de l'existence de la facture: " . $e->getMessage());
             return false;
+        }
+    }
+    
+    // Récupère les commandes d'un utilisateur qui n'ont pas de facture
+    private function getOrdersWithoutInvoices($userId) {
+        try {
+            $query = "SELECT o.* FROM orders o
+                      LEFT JOIN invoices i ON o.id = i.order_id
+                      WHERE o.user_id = ? AND i.id IS NULL";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$userId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la récupération des commandes sans facture: " . $e->getMessage());
+            return [];
         }
     }
     
