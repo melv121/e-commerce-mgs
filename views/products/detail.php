@@ -4,9 +4,9 @@
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="<?php echo BASE_URL; ?>">Accueil</a></li>
-                <?php if(isset($product['category_slug']) && isset($product['category_name'])): ?>
+                <?php if(isset($product['category_name'])): ?>
                 <li class="breadcrumb-item">
-                    <a href="<?php echo BASE_URL; ?>/product/category/<?php echo htmlspecialchars($product['category_slug']); ?>">
+                    <a href="<?php echo BASE_URL; ?>/product/category/<?php echo isset($product['category_slug']) ? htmlspecialchars($product['category_slug']) : strtolower(preg_replace('/[^a-zA-Z0-9]/', '-', $product['category_name'])); ?>">
                         <?php echo ucfirst(htmlspecialchars($product['category_name'])); ?>
                     </a>
                 </li>
@@ -15,30 +15,17 @@
             </ol>
         </nav>
         
-        <?php if (isset($_SESSION['error_message'])): ?>
-            <div class="alert alert-danger">
-                <?php echo $_SESSION['error_message']; ?>
-            </div>
-            <?php unset($_SESSION['error_message']); ?>
-        <?php endif; ?>
-        
-        <?php if (isset($_SESSION['success_message'])): ?>
-            <div class="alert alert-success">
-                <?php echo $_SESSION['success_message']; ?>
-            </div>
-            <?php unset($_SESSION['success_message']); ?>
-        <?php endif; ?>
-        
         <!-- Détail du produit -->
         <div class="col-md-6">
             <div class="product-image-gallery">
                 <div class="product-main-image mb-3">
                     <img 
-                        src="<?php echo BASE_URL; ?>/<?php echo $product['image']; ?>" 
-                        alt="<?php echo $product['name']; ?>" 
+                        src="<?php echo BASE_URL . '/' . htmlspecialchars($product['image']); ?>" 
+                        alt="<?php echo htmlspecialchars($product['name']); ?>" 
                         class="img-fluid rounded"
+                        id="mainProductImage"
                     >
-                    <?php if ($product['discount']): ?>
+                    <?php if (isset($product['discount']) && $product['discount'] > 0): ?>
                         <div class="product-badge-detail bg-danger text-white">-<?php echo $product['discount']; ?>%</div>
                     <?php endif; ?>
                 </div>
@@ -48,10 +35,10 @@
                     <?php foreach ($product['gallery'] as $image): ?>
                     <div class="col-3">
                         <img 
-                            src="<?php echo BASE_URL; ?>/<?php echo $image['thumbnail']; ?>" 
-                            alt="<?php echo $product['name']; ?> - Vue <?php echo $image['position']; ?>"
+                            src="<?php echo BASE_URL . '/' . htmlspecialchars($image['thumbnail']); ?>" 
+                            alt="<?php echo htmlspecialchars($product['name']); ?> - Vue" 
                             class="img-fluid rounded thumbnail-image"
-                            data-full="<?php echo BASE_URL; ?>/<?php echo $image['full']; ?>"
+                            data-full="<?php echo BASE_URL . '/' . htmlspecialchars($image['full']); ?>"
                         >
                     </div>
                     <?php endforeach; ?>
@@ -61,10 +48,10 @@
         </div>
         
         <div class="col-md-6">
-            <h1 class="product-title mb-3"><?php echo $product['name']; ?></h1>
+            <h1 class="product-title mb-3"><?php echo htmlspecialchars($product['name']); ?></h1>
             
             <div class="product-price mb-4">
-                <?php if ($product['discount']): ?>
+                <?php if (isset($product['discount']) && $product['discount'] > 0): ?>
                     <span class="text-muted text-decoration-line-through">
                         <?php echo number_format($product['price'], 2, ',', ' '); ?> €
                     </span>
@@ -77,7 +64,7 @@
             </div>
             
             <div class="product-description mb-4">
-                <?php echo nl2br($product['description']); ?>
+                <?php echo nl2br(htmlspecialchars($product['description'])); ?>
             </div>
             
             <div class="product-stock mb-4">
@@ -90,9 +77,64 @@
                 <?php endif; ?>
             </div>
             
+            <!-- Variantes de couleur -->
+            <?php if (!empty($product['variants']) && isset($product['has_variants']) && $product['has_variants']): ?>
+            <div class="product-variants mb-4">
+                <h6>Couleurs disponibles:</h6>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <?php foreach ($product['variants'] as $index => $variant): 
+                        // Déterminer si la couleur est claire pour appliquer une classe spéciale
+                        $isLightColor = false;
+                        if (preg_match('/#([a-f0-9]{2})([a-f0-9]{2})([a-f0-9]{2})/i', $variant['color'], $matches)) {
+                            $r = hexdec($matches[1]);
+                            $g = hexdec($matches[2]);
+                            $b = hexdec($matches[3]);
+                            $isLightColor = ($r + $g + $b > 550); // Seuil arbitraire pour déterminer si la couleur est claire
+                        }
+                    ?>
+                        <div class="product-color-variant <?php echo $isLightColor ? 'light-color' : ''; ?> <?php echo $index === 0 ? 'selected' : ''; ?>" 
+                             data-variant-id="<?php echo htmlspecialchars($variant['id']); ?>"
+                             data-image="<?php echo BASE_URL . '/' . htmlspecialchars($variant['image']); ?>"
+                             data-color="<?php echo htmlspecialchars($variant['color']); ?>"
+                             data-color-name="<?php echo htmlspecialchars($variant['color_name']); ?>"
+                             style="background-color: <?php echo htmlspecialchars($variant['color']); ?>;"
+                             title="<?php echo htmlspecialchars($variant['color_name']); ?>">
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+
+                <!-- Bouton de sélection de couleur -->
+                <div class="color-selection-dropdown">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100" type="button" id="colorDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="color-preview-dot" style="background-color: <?php echo htmlspecialchars($product['variants'][0]['color']); ?>"></span>
+                        <span id="dropdownColorName"><?php echo htmlspecialchars($product['variants'][0]['color_name']); ?></span>
+                    </button>
+                    <ul class="dropdown-menu w-100" aria-labelledby="colorDropdown">
+                        <?php foreach ($product['variants'] as $variant): ?>
+                            <li>
+                                <a class="dropdown-item color-dropdown-item" href="#" 
+                                   data-variant-id="<?php echo htmlspecialchars($variant['id']); ?>"
+                                   data-image="<?php echo BASE_URL . '/' . htmlspecialchars($variant['image']); ?>"
+                                   data-color="<?php echo htmlspecialchars($variant['color']); ?>"
+                                   data-color-name="<?php echo htmlspecialchars($variant['color_name']); ?>">
+                                   <span class="color-preview-dot" style="background-color: <?php echo htmlspecialchars($variant['color']); ?>"></span>
+                                   <?php echo htmlspecialchars($variant['color_name']); ?>
+                                </a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            </div>
+            
+            <div id="selected-color-info" class="mb-4">
+                <p>Couleur sélectionnée: <span id="selected-color-name"><?php echo !empty($product['variants']) ? htmlspecialchars($product['variants'][0]['color_name']) : '-'; ?></span></p>
+            </div>
+            <?php endif; ?>
+            
             <?php if ($product['stock'] > 0): ?>
                 <!-- Formulaire d'ajout au panier -->
-                <form action="<?php echo BASE_URL; ?>/cart/add/<?php echo $product['id']; ?>" method="post" class="add-to-cart-form" data-product-id="<?php echo $product['id']; ?>">
+                <form action="<?php echo BASE_URL; ?>/cart/add/<?php echo $product['id']; ?>" method="post" class="add-to-cart-form">
+                    <input type="hidden" name="variant_id" id="variant_id" value="<?php echo !empty($product['variants']) ? htmlspecialchars($product['variants'][0]['id']) : ''; ?>">
                     <div class="row">
                         <div class="col-md-4 mb-3">
                             <label for="quantity" class="form-label">Quantité</label>
@@ -108,53 +150,93 @@
                         <i class="fas fa-shopping-cart me-2"></i> Ajouter au panier
                     </button>
                 </form>
+            <?php else: ?>
+                <p class="alert alert-warning">Ce produit est actuellement en rupture de stock.</p>
             <?php endif; ?>
             
-            <div class="product-additional-info mt-5">
-                <div class="row">
-                    <div class="col-md-4 product-info-item">
-                        <i class="fas fa-truck animated-icon"></i>
-                        <p>Livraison gratuite<br>à partir de 50€</p>
-                    </div>
-                    <div class="col-md-4 product-info-item">
-                        <i class="fas fa-exchange-alt animated-icon"></i>
-                        <p>Retours gratuits<br>sous 30 jours</p>
-                    </div>
-                    <div class="col-md-4 product-info-item">
-                        <i class="fas fa-shield-alt animated-icon"></i>
-                        <p>Garantie<br>2 ans</p>
-                    </div>
+            <!-- Informations supplémentaires sur le produit -->
+            <div class="product-meta mt-4">
+                <div class="mb-2">
+                    <strong>Catégorie:</strong> 
+                    <?php if(isset($product['category_name'])): ?>
+                        <a href="<?php echo BASE_URL; ?>/product/category/<?php echo isset($product['category_slug']) ? htmlspecialchars($product['category_slug']) : strtolower(preg_replace('/[^a-zA-Z0-9]/', '-', $product['category_name'])); ?>">
+                            <?php echo ucfirst(htmlspecialchars($product['category_name'])); ?>
+                        </a>
+                    <?php else: ?>
+                        Non catégorisé
+                    <?php endif; ?>
                 </div>
+                <?php if(isset($product['sku'])): ?>
+                <div class="mb-2">
+                    <strong>Référence:</strong> <?php echo htmlspecialchars($product['sku']); ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
     </div>
     
     <!-- Produits similaires -->
     <?php if (!empty($similarProducts)): ?>
-    <div class="row mt-5">
-        <div class="col-12">
-            <h2 class="section-title mb-4">Produits similaires</h2>
+    <div class="similar-products mt-5">
+        <h3 class="mb-4">Produits similaires</h3>
+        <div class="row">
+            <?php foreach ($similarProducts as $similarProduct): ?>
+                <div class="col-md-3 col-6 mb-4">
+                    <div class="card h-100">
+                        <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $similarProduct['id']; ?>">
+                            <img src="<?php echo BASE_URL . '/' . htmlspecialchars($similarProduct['image']); ?>" 
+                                class="card-img-top" 
+                                alt="<?php echo htmlspecialchars($similarProduct['name']); ?>">
+                        </a>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $similarProduct['id']; ?>" class="text-decoration-none text-dark">
+                                    <?php echo htmlspecialchars($similarProduct['name']); ?>
+                                </a>
+                            </h5>
+                            <p class="card-text">
+                                <?php if (isset($similarProduct['discount']) && $similarProduct['discount'] > 0): ?>
+                                    <span class="text-muted text-decoration-line-through">
+                                        <?php echo number_format($similarProduct['price'], 2, ',', ' '); ?> €
+                                    </span>
+                                    <span class="text-danger">
+                                        <?php echo number_format($similarProduct['price'] * (1 - $similarProduct['discount'] / 100), 2, ',', ' '); ?> €
+                                    </span>
+                                <?php else: ?>
+                                    <span><?php echo number_format($similarProduct['price'], 2, ',', ' '); ?> €</span>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+                        <div class="card-footer bg-white border-top-0">
+                            <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $similarProduct['id']; ?>" class="btn btn-sm btn-outline-primary w-100">Voir le produit</a>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
-        
-        <?php foreach ($similarProducts as $similarProduct): ?>
-            <div class="col-md-3">
-                <?php include 'views/partials/product-card.php'; ?>
-            </div>
-        <?php endforeach; ?>
     </div>
     <?php endif; ?>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Galerie d'images
-    const thumbnails = document.querySelectorAll('.thumbnail-image');
-    const mainImage = document.querySelector('.product-main-image img');
+    // Chargement du script de gestion des variantes de produit
+    if (document.querySelector('.product-color-variant')) {
+        const script = document.createElement('script');
+        script.src = '<?php echo BASE_URL; ?>/assets/js/product-variants.js';
+        document.body.appendChild(script);
+    }
     
-    thumbnails.forEach(thumbnail => {
+    // Gestion des images miniatures de la galerie
+    const thumbnails = document.querySelectorAll('.thumbnail-image');
+    const mainImage = document.getElementById('mainProductImage');
+    
+    thumbnails.forEach(function(thumbnail) {
         thumbnail.addEventListener('click', function() {
             const fullImageUrl = this.getAttribute('data-full');
-            mainImage.src = fullImageUrl;
+            if (fullImageUrl && mainImage) {
+                mainImage.src = fullImageUrl;
+            }
         });
     });
 });

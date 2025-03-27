@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/color-theme.css?v=<?php echo time(); ?>">
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cart-notification.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/product-variants.css?v=<?php echo time(); ?>">
     
     <!-- Ajout de la variable globale BASE_URL pour JavaScript -->
     <script>
@@ -120,6 +121,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="<?php echo BASE_URL; ?>/product/promotions">Promotions</a>
                     </li>
+                    <?php if (isset($_SESSION['user'])): ?>
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?php echo BASE_URL; ?>/order/history">Mes commandes</a>
+                    </li>
+                    <?php endif; ?>
                 </ul>
                 <div class="d-flex nav-icons">
                     <a href="#" class="text-dark me-3" data-bs-toggle="modal" data-bs-target="#searchModal"><i class="fas fa-search"></i></a>

@@ -1,4 +1,13 @@
-Ce dossier contient les images des variantes de produits.
+Ce dossier contient les images des variantes de couleur des produits.
+Chaque variante de couleur d'un produit doit être nommée selon le format:
+product{ID}_{color}.jpg
+
+Exemple:
+- product1_black.jpg
+- product1_red.jpg
+- product1_blue.jpg
+
+Cela permet d'associer facilement les images aux variantes de couleur dans la base de données.
 
 Il inclut:
 - teeshirtnikehomme.jpg, teeshirtnikehomme1.jpg, etc.: Variantes du T-shirt Nike Homme

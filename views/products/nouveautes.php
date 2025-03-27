@@ -6,42 +6,69 @@
 </div>
 
 <div class="container py-5">
-    <h1 class="mb-4">Nouveautés</h1>
-    
-    <div class="row g-4">
-        <?php foreach ($products as $product): ?>
-        <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
-            <div class="product-card animate-slide-up">
-                <div class="product-badge bg-success">Nouveau</div>
-                <div class="product-image">
-                    <!-- Corriger l'affichage des images -->
-                    <img src="<?= strpos($product['image'], 'http') === 0 ? $product['image'] : (BASE_URL . '/' . $product['image']) ?>" alt="<?= $product['name'] ?>">
-                    <div class="product-overlay">
-                        <a href="<?= BASE_URL ?>/product/detail/<?= $product['id'] ?>" class="btn" data-bs-toggle="tooltip" title="Vue rapide">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                        <a href="javascript:void(0);" class="btn add-to-cart-btn" data-product-id="<?= $product['id'] ?>" data-bs-toggle="tooltip" title="Ajouter au panier">
-                            <i class="fas fa-shopping-cart"></i>
-                        </a>
-                        <a href="#" class="btn" data-bs-toggle="tooltip" title="Ajouter aux favoris">
-                            <i class="fas fa-heart"></i>
-                        </a>
-                    </div>
-                </div>
-                <div class="product-info">
-                    <span class="product-category"><?= $product['category_name'] ?? 'Catégorie' ?></span>
-                    <h3 class="product-title"><?= $product['name'] ?></h3>
-                    <div class="product-rating">
-                        <?php 
-                        $rating = $product['rating'] ?? 4;
-                        for($i = 1; $i <= 5; $i++): ?>
-                            <i class="fas fa-<?= ($i <= $rating) ? 'star' : (($i - 0.5 <= $rating) ? 'star-half-alt' : 'star') ?>"></i>
-                        <?php endfor; ?>
-                    </div>
-                    <p class="product-price"><?= number_format($product['price'], 2, ',', ' ') ?> €</p>
-                </div>
-            </div>
+    <div class="row">
+        <div class="col-12 mb-4">
+            <h1 class="display-5 fw-bold">Nouvelles Collections</h1>
+            <p class="lead">Découvrez nos derniers articles et tendances du moment.</p>
+            
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="<?php echo BASE_URL; ?>">Accueil</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Nouvelles Collections</li>
+                </ol>
+            </nav>
         </div>
-        <?php endforeach; ?>
     </div>
+    
+    <?php if (!empty($products)): ?>
+        <div class="row">
+            <?php foreach ($products as $product): ?>
+                <div class="col-md-3 col-6 mb-4">
+                    <div class="card h-100 product-card">
+                        <div class="product-image">
+                            <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $product['id']; ?>">
+                                <img src="<?php echo BASE_URL . '/' . $product['image']; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($product['name']); ?>">
+                            </a>
+                            <?php if (isset($product['discount']) && $product['discount'] > 0): ?>
+                                <div class="product-badge bg-danger text-white">-<?php echo $product['discount']; ?>%</div>
+                            <?php endif; ?>
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $product['id']; ?>" class="text-decoration-none text-dark">
+                                    <?php echo htmlspecialchars($product['name']); ?>
+                                </a>
+                            </h5>
+                            <p class="card-text text-muted small"><?php echo htmlspecialchars($product['category_name'] ?? 'Non catégorisé'); ?></p>
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <?php if (isset($product['discount']) && $product['discount'] > 0): ?>
+                                    <div>
+                                        <span class="text-muted text-decoration-line-through"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</span>
+                                        <span class="text-danger fw-bold"><?php echo number_format($product['price'] * (1 - $product['discount'] / 100), 2, ',', ' '); ?> €</span>
+                                    </div>
+                                <?php else: ?>
+                                    <span class="fw-bold"><?php echo number_format($product['price'], 2, ',', ' '); ?> €</span>
+                                <?php endif; ?>
+                                
+                                <?php if ($product['stock'] > 0): ?>
+                                    <span class="badge bg-success">En stock</span>
+                                <?php else: ?>
+                                    <span class="badge bg-danger">Rupture</span>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-white border-top-0">
+                            <div class="d-grid">
+                                <a href="<?php echo BASE_URL; ?>/product/detail/<?php echo $product['id']; ?>" class="btn btn-sm btn-outline-primary">Voir le produit</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php else: ?>
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle me-2"></i> Aucun nouveau produit disponible pour le moment.
+        </div>
+    <?php endif; ?>
 </div>

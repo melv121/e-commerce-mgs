@@ -16,7 +16,7 @@
                         <div class="hero-content">
                             <h1 class="mega-title">MGS</h1>
                             <p class="lead">Dépasse tes limites avec notre nouvelle collection 2025</p>
-                            <a href="#" class="btn btn-primary btn-lg">ACHETEZ MAINTENANT</a>
+                            <a href="<?php echo BASE_URL; ?>/product/nouveautes" class="btn btn-primary btn-lg">ACHETEZ MAINTENANT</a>
                         </div>
                     </div>
                 </div>

@@ -1,10 +1,8 @@
 <?php
 class ProductController {
-    
     private $db;
     
     public function __construct() {
-        // Initialiser la connexion à la base de données
         require_once 'config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
@@ -15,7 +13,6 @@ class ProductController {
         $filters = [];
         $products = [];
         
-        // Déterminer la catégorie principale
         if ($category) {
             switch ($category) {
                 case 'homme':
@@ -31,7 +28,6 @@ class ProductController {
                     $pageTitle = "Tous les produits";
             }
             
-            // Ajouter le sous-titre pour la sous-catégorie
             if ($subcategory) {
                 switch ($subcategory) {
                     case 'chaussures':
@@ -47,61 +43,350 @@ class ProductController {
             }
         }
         
-        // Récupérer les produits basés sur la catégorie et sous-catégorie
         $products = $this->getProductsByCategoryAndSubcategory($category, $subcategory);
-        
-        // Récupérer les filtres disponibles
         $filters = $this->getAvailableFilters($category, $subcategory);
         
-        // Charger la vue
         require_once 'views/templates/header.php';
         require_once 'views/products/category.php';
         require_once 'views/templates/footer.php';
     }
     
+    // Méthode complètement réécrite pour résoudre le problème d'accès aux produits
     public function detail($id) {
-        $pageTitle = "Détail du produit";
+        // Journaliser l'appel pour débogage
+        error_log("Demande de détail produit avec ID: " . $id);
         
-        // Utiliser le modèle Product pour récupérer les détails
-        require_once 'models/Product.php';
-        $productModel = new Product($this->db);
-        $product = $productModel->getById($id);
+        try {
+            // Validation de base
+            if (!is_numeric($id) || $id <= 0) {
+                error_log("ID produit invalide: " . $id);
+                $this->showError404();
+                return;
+            }
+            
+            // Requête simplifiée pour éviter les jointures qui peuvent échouer
+            $query = "SELECT * FROM products WHERE id = ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$id]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$product) {
+                error_log("Produit non trouvé avec ID: " . $id);
+                $this->showError404();
+                return;
+            }
+            
+            // Récupérer les informations de catégorie séparément
+            if (!empty($product['category_id'])) {
+                $catQuery = "SELECT name, slug FROM categories WHERE id = ?";
+                $stmt = $this->db->prepare($catQuery);
+                $stmt->execute([$product['category_id']]);
+                $category = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if ($category) {
+                    $product['category_name'] = $category['name'];
+                    $product['category_slug'] = $category['slug'];
+                }
+            }
+            
+            // Valeurs par défaut si catégorie non trouvée
+            if (!isset($product['category_name'])) {
+                $product['category_name'] = 'Non catégorisé';
+                $product['category_slug'] = 'non-categorise';
+            }
+            
+            // Données additionnelles (gérées de façon robuste)
+            $product['gallery'] = $this->getProductGallery($id);
+            $product['variants'] = $this->getProductVariants($id);
+            $similarProducts = $this->getSimilarProducts($id, $product['category_id'] ?? 0);
+            
+            $pageTitle = $product['name'];
+            
+            require_once 'views/templates/header.php';
+            require_once 'views/products/detail.php';
+            require_once 'views/templates/footer.php';
+            
+        } catch (Exception $e) {
+            error_log("Erreur dans detail(): " . $e->getMessage());
+            $this->showError404();
+        }
+        
+        // Vérifier si le produit existe
+        $product = $this->getProductById($id);
         
         if (!$product) {
-            // Produit non trouvé
-            header("Location: " . BASE_URL . "/404");
-            exit;
+            // ...existing code...
         }
         
-        $pageTitle = $product['name'];
+        // Récupérer les variantes de couleur
+        $product['variants'] = $this->getProductVariants($product['id']);
         
-        // Définir l'image par défaut si nécessaire
-        if (!isset($product['image']) || empty($product['image'])) {
-            $product['image'] = $this->getProductImageByType($product['name'], $product['category_name']);
+        // Si aucune variante n'est trouvée mais que c'est un t-shirt, créer des variantes par défaut
+        if (empty($product['variants'])) {
+            $productName = strtolower($product['name']);
+            
+            // Vérifier si c'est un t-shirt (toutes catégories confondues)
+            $isTshirt = (strpos($productName, 'tee shirt') !== false || 
+                         strpos($productName, 't-shirt') !== false || 
+                         strpos($productName, 'tshirt') !== false ||
+                         strpos($productName, 'chemise') !== false ||
+                         strpos($productName, 'polo') !== false);
+            
+            if ($isTshirt) {
+                $product['variants'] = $this->generateDefaultVariants($product);
+                $product['has_variants'] = true;
+            } else {
+                $product['has_variants'] = false;
+            }
+        } else {
+            $product['has_variants'] = true;
         }
-        
-        // Ajouter les attributs comme la note et la marque
-        $product['rating'] = isset($product['rating']) ? $product['rating'] : rand(3, 5);
-        $product['brand'] = $this->extractBrandFromName($product['name']);
-        
-        // Récupérer les produits similaires
-        $similarProducts = $this->getSimilarProducts($product['category_id'], $id);
-        
-        // Charger la vue
-        require_once 'views/templates/header.php';
-        require_once 'views/products/detail.php';
-        require_once 'views/templates/footer.php';
     }
     
-    public function nouveautes() {
-        $pageTitle = "Nouveautés";
-        $products = $this->getNewProducts();
-        
-        require_once 'views/templates/header.php';
-        require_once 'views/products/nouveautes.php';
-        require_once 'views/templates/footer.php';
+    // Méthode pour afficher la page 404
+    private function showError404() {
+        header("Location: " . BASE_URL . "/404");
+        exit;
     }
-
+    
+    // Récupération de la galerie d'images
+    private function getProductGallery($productId) {
+        try {
+            $query = "SELECT * FROM product_gallery WHERE product_id = ? ORDER BY position";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Erreur dans getProductGallery: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    // Méthode améliorée pour récupérer les variantes de produit
+    private function getProductVariants($productId) {
+        try {
+            // D'abord, récupérer les informations du produit pour vérifier la marque
+            $query = "SELECT name FROM products WHERE id = ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if (!$product) {
+                return [];
+            }
+            
+            $productName = strtolower($product['name']);
+            
+            // Récupérer les variantes existantes en base de données
+            $query = "SELECT * FROM product_variants WHERE product_id = ? ORDER BY position";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId]);
+            $variants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Si des variantes existent déjà en base, les utiliser
+            if (!empty($variants)) {
+                return $variants;
+            }
+            
+            // Sinon, créer des variantes spécifiques selon la marque
+            if (strpos($productName, 'nike') !== false) {
+                // Variantes pour les produits Nike
+                return $this->createBrandVariants($productId, 'nike');
+            } else if (strpos($productName, 'adidas') !== false) {
+                // Variantes pour les produits Adidas
+                return $this->createBrandVariants($productId, 'adidas');
+            } else if (strpos($productName, 'teddy smith') !== false) {
+                // Variantes pour les produits Teddy Smith
+                return $this->createBrandVariants($productId, 'teddy smith');
+            } else {
+                // Variantes génériques pour les autres produits
+                return $this->createDefaultVariants($productId);
+            }
+        } catch (Exception $e) {
+            error_log("Erreur lors de la récupération des variantes: " . $e->getMessage());
+            return $this->createDefaultVariants($productId);
+        }
+    }
+    
+    // Méthode pour créer des variantes selon la marque
+    private function createBrandVariants($productId, $brand) {
+        try {
+            // Récupérer l'image du produit
+            $query = "SELECT image FROM products WHERE id = ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $image = isset($product['image']) ? $product['image'] : 'assets/images/products/default.jpg';
+            
+            // Variantes spécifiques selon la marque
+            switch($brand) {
+                case 'nike':
+                    return [
+                        [
+                            'id' => 'var_' . $productId . '_1',
+                            'product_id' => $productId,
+                            'color' => '#000000',
+                            'color_name' => 'Noir',
+                            'image' => $image,
+                            'position' => 1
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_2',
+                            'product_id' => $productId,
+                            'color' => '#FFFFFF',
+                            'color_name' => 'Blanc',
+                            'image' => $image,
+                            'position' => 2
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_3',
+                            'product_id' => $productId,
+                            'color' => '#FF0000',
+                            'color_name' => 'Rouge',
+                            'image' => $image,
+                            'position' => 3
+                        ]
+                    ];
+                
+                case 'adidas':
+                    return [
+                        [
+                            'id' => 'var_' . $productId . '_1',
+                            'product_id' => $productId,
+                            'color' => '#000000',
+                            'color_name' => 'Noir',
+                            'image' => $image,
+                            'position' => 1
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_2',
+                            'product_id' => $productId,
+                            'color' => '#FFFFFF',
+                            'color_name' => 'Blanc',
+                            'image' => $image,
+                            'position' => 2
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_3',
+                            'product_id' => $productId,
+                            'color' => '#0000FF',
+                            'color_name' => 'Bleu',
+                            'image' => $image,
+                            'position' => 3
+                        ]
+                    ];
+                
+                case 'teddy smith':
+                    return [
+                        [
+                            'id' => 'var_' . $productId . '_1',
+                            'product_id' => $productId,
+                            'color' => '#000000',
+                            'color_name' => 'Noir',
+                            'image' => $image,
+                            'position' => 1
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_2',
+                            'product_id' => $productId,
+                            'color' => '#808080',
+                            'color_name' => 'Gris',
+                            'image' => $image,
+                            'position' => 2
+                        ],
+                        [
+                            'id' => 'var_' . $productId . '_3',
+                            'product_id' => $productId,
+                            'color' => '#A0522D',
+                            'color_name' => 'Marron',
+                            'image' => $image,
+                            'position' => 3
+                        ]
+                    ];
+                
+                default:
+                    return $this->createDefaultVariants($productId);
+            }
+        } catch (Exception $e) {
+            error_log("Erreur lors de la création des variantes de marque: " . $e->getMessage());
+            return $this->createDefaultVariants($productId);
+        }
+    }
+    
+    // Méthode pour créer des variantes par défaut
+    private function createDefaultVariants($productId) {
+        try {
+            // Récupérer l'image principale du produit
+            $query = "SELECT image FROM products WHERE id = ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId]);
+            $product = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            $image = isset($product['image']) ? $product['image'] : 'assets/images/products/default.jpg';
+            
+            // Créer des variantes de couleur par défaut
+            return [
+                [
+                    'id' => 'var_' . $productId . '_1',
+                    'product_id' => $productId,
+                    'color' => '#000000',
+                    'color_name' => 'Noir',
+                    'image' => $image,
+                    'position' => 1,
+                    'is_default' => true
+                ],
+                [
+                    'id' => 'var_' . $productId . '_2',
+                    'product_id' => $productId,
+                    'color' => '#FF0000',
+                    'color_name' => 'Rouge',
+                    'image' => $image,
+                    'position' => 2,
+                    'is_default' => false
+                ],
+                [
+                    'id' => 'var_' . $productId . '_3',
+                    'product_id' => $productId,
+                    'color' => '#0000FF',
+                    'color_name' => 'Bleu',
+                    'image' => $image,
+                    'position' => 3,
+                    'is_default' => false
+                ],
+                [
+                    'id' => 'var_' . $productId . '_4',
+                    'product_id' => $productId,
+                    'color' => '#FFFFFF',
+                    'color_name' => 'Blanc',
+                    'image' => $image,
+                    'position' => 4,
+                    'is_default' => false
+                ]
+            ];
+        } catch (Exception $e) {
+            error_log("Erreur lors de la création des variantes par défaut: " . $e->getMessage());
+            return [];
+        }
+    }
+    
+    // Récupérer des produits similaires
+    private function getSimilarProducts($productId, $categoryId, $limit = 4) {
+        try {
+            if (empty($categoryId)) {
+                return [];
+            }
+            
+            $query = "SELECT * FROM products WHERE id != ? AND category_id = ? LIMIT ?";
+            $stmt = $this->db->prepare($query);
+            $stmt->execute([$productId, $categoryId, $limit]);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            error_log("Erreur dans getSimilarProducts: " . $e->getMessage());
+            return [];
+        }
+    }
+    
     public function promotions() {
         $pageTitle = "Promotions";
         $products = $this->getPromotionalProducts();
@@ -113,23 +398,18 @@ class ProductController {
 
     private function getProductsByCategoryAndSubcategory($category = null, $subcategory = null) {
         try {
-            // Convertir le nom de catégorie en ID de catégorie
             $categoryId = $this->getCategoryIdByName($category);
-            
-            // Construire la requête de base
             $query = "SELECT p.*, c.name as category_name 
                       FROM products p 
                       LEFT JOIN categories c ON p.category_id = c.id 
                       WHERE 1=1";
             $params = [];
             
-            // Ajouter le filtre de catégorie si spécifié
             if ($categoryId) {
                 $query .= " AND p.category_id = ?";
                 $params[] = $categoryId;
             }
             
-            // Ajouter le filtre de sous-catégorie si spécifié
             if ($subcategory) {
                 switch ($subcategory) {
                     case 'chaussures':
@@ -145,30 +425,24 @@ class ProductController {
             }
             
             $query .= " ORDER BY p.name ASC";
-            
             $stmt = $this->db->prepare($query);
             $stmt->execute($params);
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Si aucun produit n'est trouvé, utiliser des données simulées
             if (empty($products)) {
                 return $this->getSimulatedProducts($category, $subcategory);
             }
             
-            // Récupérer les informations sur les produits en promotion
             $promoProducts = $this->getPromotionalProductsInfo();
             
-            // Ajouter des champs supplémentaires pour la compatibilité avec la vue
             foreach ($products as &$product) {
                 $product['brand'] = $this->extractBrandFromName($product['name']);
-                $product['rating'] = rand(3, 5); // Attribution d'une note aléatoire entre 3 et 5
+                $product['rating'] = rand(3, 5);
                 
-                // Assurer que chaque produit a une image appropriée
                 if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
                     $product['image'] = $this->getProductImageByType($product['name'], $category);
                 }
                 
-                // Vérifier si le produit est dans la liste des promotions
                 $productId = $product['id'];
                 if (isset($promoProducts[$productId])) {
                     $product['promotion'] = true;
@@ -179,31 +453,25 @@ class ProductController {
             
             return $products;
         } catch (PDOException $e) {
-            // En cas d'erreur, retourner un tableau vide et enregistrer l'erreur
             error_log("Erreur lors de la récupération des produits: " . $e->getMessage());
             return $this->getSimulatedProducts($category, $subcategory);
         }
     }
 
-    // Méthode pour générer des produits simulés si la base de données ne retourne rien
     private function getSimulatedProducts($category, $subcategory) {
         $products = [];
         $brands = ['Nike', 'Adidas', 'Puma', 'Reebok', 'Under Armour', 'Teddy Smith'];
         $categories = ['homme', 'femme', 'enfant'];
         
-        // Déterminer quelle catégorie utiliser
         $catToUse = $category ?? $categories[array_rand($categories)];
-        
-        // Générer entre 8 et 16 produits
         $count = rand(8, 16);
         
         for ($i = 1; $i <= $count; $i++) {
             $brand = $brands[array_rand($brands)];
             $price = rand(30, 150);
-            $isPromotion = (rand(1, 4) === 1); // 25% de chance d'être en promo
+            $isPromotion = (rand(1, 4) === 1);
             $discount = rand(10, 30);
             $salePrice = $isPromotion ? round($price * (1 - $discount / 100), 2) : null;
-            
             $productType = '';
             
             if ($subcategory === 'chaussures' || rand(1, 3) === 1) {
@@ -235,7 +503,7 @@ class ProductController {
         
         return $products;
     }
-    
+
     private function getCategoryIdByName($categoryName) {
         if (!$categoryName) return null;
         
@@ -244,15 +512,13 @@ class ProductController {
             $stmt = $this->db->prepare($query);
             $stmt->execute([$categoryName]);
             $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
             return $result ? $result['id'] : null;
         } catch (PDOException $e) {
             return null;
         }
     }
-    
+
     private function extractBrandFromName($name) {
-        // Essayer d'extraire une marque connue du nom du produit
         $brands = ['Nike', 'Adidas', 'Puma', 'Reebok', 'Under Armour', 'Teddy Smith'];
         
         foreach ($brands as $brand) {
@@ -261,15 +527,11 @@ class ProductController {
             }
         }
         
-        // Par défaut, retourner la première partie du nom
         $parts = explode(' ', $name);
         return count($parts) > 0 ? $parts[0] : 'Marque';
     }
 
     private function getAvailableFilters($category, $subcategory) {
-        // Dans une application réelle, ces filtres seraient générés dynamiquement
-        // en fonction des produits disponibles dans la catégorie
-        
         return [
             'price' => [
                 'title' => 'Prix',
@@ -324,11 +586,8 @@ class ProductController {
             ]
         ];
     }
-    
+
     private function getProductById($id) {
-        // Cette fonction récupérerait normalement les détails d'un produit depuis la base de données
-        // Pour l'instant, on utilise des données fictives
-        
         $products = $this->getProductsByCategoryAndSubcategory(null, null);
         
         foreach ($products as $product) {
@@ -339,34 +598,6 @@ class ProductController {
         
         return null;
     }
-    
-    private function getSimilarProducts($categoryId, $excludeId) {
-        try {
-            $query = "SELECT p.*, c.name as category_name 
-                      FROM products p
-                      LEFT JOIN categories c ON p.category_id = c.id
-                      WHERE p.category_id = ? AND p.id != ?
-                      ORDER BY RAND() 
-                      LIMIT 4";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$categoryId, $excludeId]);
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // S'assurer que chaque produit a une image appropriée et d'autres attributs nécessaires
-            foreach ($products as &$product) {
-                if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
-                    $product['image'] = $this->getProductImageByType($product['name'], $product['category_name']);
-                }
-                $product['rating'] = rand(3, 5);
-                $product['brand'] = $this->extractBrandFromName($product['name']);
-            }
-            
-            return $products;
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération des produits similaires: " . $e->getMessage());
-            return [];
-        }
-    }
 
     private function getNewProducts() {
         try {
@@ -375,17 +606,12 @@ class ProductController {
             $stmt->execute();
             $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // Ajouter des informations supplémentaires à chaque produit
             foreach ($products as &$product) {
-                // S'assurer que l'image est valide
                 if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
                     $product['image'] = $this->getProductImageByType($product['name'], $product['category_name'] ?? null);
                 }
                 
-                // Ajouter une note aléatoire
                 $product['rating'] = $product['rating'] ?? rand(3, 5);
-                
-                // Ajouter la marque extraite du nom du produit
                 $product['brand'] = $this->extractBrandFromName($product['name']);
             }
             
@@ -398,7 +624,6 @@ class ProductController {
 
     private function getPromotionalProducts() {
         try {
-            // Liste de produits spécifiques en promotion avec leurs discounts (ajustez selon vos besoins)
             $promotionProducts = [
                 ["name" => "T-shirt Adidas Homme", "discount" => 15, "id" => 7],
                 ["name" => "Chaussures Running Nike Enfant", "discount" => 15, "id" => 12],
@@ -407,23 +632,19 @@ class ProductController {
                 ["name" => "T-shirt Teddy Smith Enfant", "discount" => 18, "id" => 11]
             ];
             
-            // Récupérer les informations complètes pour ces produits
             $products = [];
             
             foreach ($promotionProducts as $promo) {
-                // Chercher le produit dans la base de données
                 $query = "SELECT * FROM products WHERE id = ? OR name LIKE ?";
                 $stmt = $this->db->prepare($query);
                 $stmt->execute([$promo['id'], '%' . $promo['name'] . '%']);
                 $product = $stmt->fetch(PDO::FETCH_ASSOC);
                 
                 if ($product) {
-                    // Si le produit existe, ajouter les informations de promotion
                     $product['promotion'] = true;
                     $product['discount'] = $promo['discount'];
                     $product['sale_price'] = $product['price'] * (1 - $promo['discount']/100);
                     
-                    // S'assurer que l'image est valide
                     if (!isset($product['image']) || empty($product['image']) || strpos($product['image'], 'default') !== false) {
                         $product['image'] = $this->getProductImageByType($product['name']);
                     }
@@ -435,7 +656,6 @@ class ProductController {
                 }
             }
             
-            // Si moins de 5 produits sont trouvés, ajouter des produits simulés
             if (count($products) < 5) {
                 $simulatedProducts = [
                     [
@@ -475,7 +695,6 @@ class ProductController {
                     ]
                 ];
                 
-                // Ajouter seulement les produits manquants
                 $needed = 5 - count($products);
                 for ($i = 0; $i < $needed; $i++) {
                     $simulatedProduct = $simulatedProducts[$i];
@@ -496,26 +715,19 @@ class ProductController {
         }
     }
 
-    /**
-     * Récupère une URL d'image appropriée selon le type de produit
-     */
     private function getProductImageByType($productName, $category = null) {
         $productName = strtolower($productName);
         
-        // Vérifier si le dossier assets/images/products existe
         $productImagesDir = __DIR__ . '/../assets/images/products';
         if (!file_exists($productImagesDir)) {
-            // Créer le répertoire s'il n'existe pas
             mkdir($productImagesDir, 0777, true);
         }
         
-        // Vérifier si une image locale existe
         $localImage = $this->findLocalProductImage($productName);
         if ($localImage) {
             return $localImage;
         }
         
-        // Catégorie Homme
         if ($category == 'homme' || stripos($productName, 'homme') !== false) {
             if (stripos($productName, 't-shirt') !== false || stripos($productName, 'tshirt') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/d391a1e74fb93c4ca9233abc5b398e07/6d2a1e1f22d340c6a3613517a9a19990.jpg';
@@ -529,21 +741,19 @@ class ProductController {
                 return 'https://img01.ztat.net/article/spp-media-p1/28de753a1dee35ec8d0f1423bad67d73/0a451d88c7d9422887c00469a2bbdf91.jpg';
             }
         } 
-        // Catégorie Femme
         elseif ($category == 'femme' || stripos($productName, 'femme') !== false) {
             if (stripos($productName, 't-shirt') !== false || stripos($productName, 'tshirt') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/368246237c5638d68f4cead474378a99/2bf5dca2b8c740a6a655ab0426f9202f.jpg';
             } elseif (stripos($productName, 'jogging') !== false || stripos($productName, 'pantalon') !== false || stripos($productName, 'legging') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/bd6ff26137bb4e42a3a7ddb5df76d9c5/a3d573de1b8c45e89800b9dabba4603e.jpg';
             } elseif (stripos($productName, 'pull') !== false || stripos($productName, 'sweat') !== false) {
-                return 'https://img01.ztat.net/article/spp-media-p1/5a3a5c1526b14338b1bd4e952c482936/69e242c0e4764c58a10d3851cde2b03b.jpg';
+                return 'https://img01.ztat.net/article/spp-media-p1/5a3a5c1526b14338b1bd4e952c482936/69e242c0e4764c58a10d3851cde2b03e.jpg';
             } elseif (stripos($productName, 'chaussure') !== false || stripos($productName, 'basket') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/77a0fc929fb53ffc8611ecb1bddaf0af/ca4cca3b97214897a3a4390ee24ee278.jpg';
             } else {
                 return 'https://img01.ztat.net/article/spp-media-p1/82d5f6fd19153e038771cb42231e4bfb/0718e2163d5d4cfdadc10a0a7fa2ce65.jpg';
             }
         }
-        // Catégorie Enfant
         elseif ($category == 'enfant' || stripos($productName, 'enfant') !== false || stripos($productName, 'kid') !== false) {
             if (stripos($productName, 't-shirt') !== false || stripos($productName, 'tshirt') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/11fe90359cd6377382393eb3e75e7f90/8b5390dd67ad4678bbad2f44b37f5bcc.jpg';
@@ -554,10 +764,9 @@ class ProductController {
             } elseif (stripos($productName, 'chaussure') !== false || stripos($productName, 'basket') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/f6d1e2f5907634a6a7238b92064d8423/dcd23ac36b604d0c94eb1a22cbc49168.jpg';
             } else {
-                return 'https://img01.ztat.net/article/spp-media-p1/e45aafc631ef38f8a3f71a52e661248b/546be1cbe0d24b84a8cb3a9aa07ff601.jpg';
+                return 'https://img01.ztat.net/article/spp-media-p1/e45aafc631ef38f8a3f71a52e661248b/546be1cbe0d24d84a8cb3a9aa07ff601.jpg';
             }
         }
-        // Par défaut - déterminé par le nom du produit
         else {
             if (stripos($productName, 't-shirt') !== false || stripos($productName, 'tshirt') !== false) {
                 return 'https://img01.ztat.net/article/spp-media-p1/e5367096bb8d3bada56d1a205a32344a/8cbb4a78b5954c76a34f3cab483cbd27.jpg';
@@ -573,36 +782,28 @@ class ProductController {
         }
     }
 
-    /**
-     * Cherche une image locale correspondant au nom du produit
-     */
     private function findLocalProductImage($productName) {
         $baseDir = __DIR__ . '/../assets/images/products/';
         $fallbackImage = 'assets/images/products/default.jpg';
         
-        // Si le répertoire n'existe pas, retourner l'image par défaut
         if (!is_dir($baseDir)) {
             return $fallbackImage;
         }
         
-        // Normaliser le nom du produit pour la recherche
         $normalizedName = strtolower(str_replace([' ', '-', '_'], '', $productName));
         
-        // Chercher dans le dossier products
         $files = scandir($baseDir);
         foreach ($files as $file) {
             if ($file === '.' || $file === '..') continue;
             
             $normalizedFile = strtolower(str_replace([' ', '-', '_', '.jpg', '.png', '.jpeg'], '', $file));
             
-            // Si le nom de fichier contient le nom du produit normalisé
             if (strpos($normalizedFile, $normalizedName) !== false ||
                 strpos($normalizedName, $normalizedFile) !== false) {
                 return 'assets/images/products/' . $file;
             }
         }
         
-        // Chercher dans le dossier variants si le dossier existe
         $variantsDir = $baseDir . 'variants/';
         if (is_dir($variantsDir)) {
             $files = scandir($variantsDir);
@@ -611,7 +812,6 @@ class ProductController {
                 
                 $normalizedFile = strtolower(str_replace([' ', '-', '_', '.jpg', '.png', '.jpeg'], '', $file));
                 
-                // Si le nom de fichier contient le nom du produit normalisé
                 if (strpos($normalizedFile, $normalizedName) !== false ||
                     strpos($normalizedName, $normalizedFile) !== false) {
                     return 'assets/images/products/variants/' . $file;
@@ -619,17 +819,13 @@ class ProductController {
             }
         }
         
-        // Aucune image locale trouvée
         return null;
     }
 
-    // Nouvelle méthode pour obtenir les informations sur tous les produits en promotion
     private function getPromotionalProductsInfo() {
         try {
-            // On va récupérer les 5 produits en promotion
             $promotionalProducts = $this->getPromotionalProducts();
             
-            // Créer un tableau indexé par ID de produit
             $result = [];
             foreach ($promotionalProducts as $product) {
                 $result[$product['id']] = [
@@ -642,6 +838,177 @@ class ProductController {
         } catch (Exception $e) {
             error_log("Erreur lors de la récupération des informations sur les promotions: " . $e->getMessage());
             return [];
+        }
+    }
+    
+    // NOUVELLE MÉTHODE: Redirection vers la page 404
+    private function redirectTo404() {
+        header("Location: " . BASE_URL . "/404");
+        exit;
+    }
+    
+    private function generateDefaultVariants($product) {
+        $productId = $product['id'];
+        $productName = strtolower($product['name']);
+        $variants = [];
+        
+        // Déterminer les variantes selon la marque
+        if (stripos($productName, 'nike') !== false) {
+            $variants = [
+                [
+                    'id' => 'var_' . $productId . '_1',
+                    'product_id' => $productId,
+                    'color' => '#000000',
+                    'color_name' => 'Noir',
+                    'image' => $product['image'],
+                    'position' => 1
+                ],
+                [
+                    'id' => 'var_' . $productId . '_2',
+                    'product_id' => $productId,
+                    'color' => '#FFFFFF',
+                    'color_name' => 'Blanc',
+                    'image' => $product['image'],
+                    'position' => 2
+                ],
+                [
+                    'id' => 'var_' . $productId . '_3',
+                    'product_id' => $productId,
+                    'color' => '#FF0000',
+                    'color_name' => 'Rouge',
+                    'image' => $product['image'],
+                    'position' => 3
+                ]
+            ];
+        } else if (stripos($productName, 'adidas') !== false) {
+            $variants = [
+                [
+                    'id' => 'var_' . $productId . '_1',
+                    'product_id' => $productId,
+                    'color' => '#000000',
+                    'color_name' => 'Noir',
+                    'image' => $product['image'],
+                    'position' => 1
+                ],
+                [
+                    'id' => 'var_' . $productId . '_2',
+                    'product_id' => $productId,
+                    'color' => '#FFFFFF',
+                    'color_name' => 'Blanc',
+                    'image' => $product['image'],
+                    'position' => 2
+                ],
+                [
+                    'id' => 'var_' . $productId . '_3',
+                    'product_id' => $productId,
+                    'color' => '#0000FF',
+                    'color_name' => 'Bleu',
+                    'image' => $product['image'],
+                    'position' => 3
+                ]
+            ];
+        } else if (stripos($productName, 'teddy smith') !== false) {
+            $variants = [
+                [
+                    'id' => 'var_' . $productId . '_1',
+                    'product_id' => $productId,
+                    'color' => '#000000',
+                    'color_name' => 'Noir',
+                    'image' => $product['image'],
+                    'position' => 1
+                ],
+                [
+                    'id' => 'var_' . $productId . '_2',
+                    'product_id' => $productId,
+                    'color' => '#808080',
+                    'color_name' => 'Gris',
+                    'image' => $product['image'],
+                    'position' => 2
+                ],
+                [
+                    'id' => 'var_' . $productId . '_3',
+                    'product_id' => $productId,
+                    'color' => '#A0522D',
+                    'color_name' => 'Marron',
+                    'image' => $product['image'],
+                    'position' => 3
+                ]
+            ];
+        } else {
+            // Variantes génériques pour tout autre t-shirt
+            $variants = [
+                [
+                    'id' => 'var_' . $productId . '_1',
+                    'product_id' => $productId,
+                    'color' => '#000000',
+                    'color_name' => 'Noir',
+                    'image' => $product['image'],
+                    'position' => 1
+                ],
+                [
+                    'id' => 'var_' . $productId . '_2',
+                    'product_id' => $productId,
+                    'color' => '#FFFFFF',
+                    'color_name' => 'Blanc',
+                    'image' => $product['image'],
+                    'position' => 2
+                ],
+                [
+                    'id' => 'var_' . $productId . '_3',
+                    'product_id' => $productId,
+                    'color' => '#0000FF',
+                    'color_name' => 'Bleu',
+                    'image' => $product['image'],
+                    'position' => 3
+                ],
+                [
+                    'id' => 'var_' . $productId . '_4',
+                    'product_id' => $productId,
+                    'color' => '#FF0000',
+                    'color_name' => 'Rouge',
+                    'image' => $product['image'],
+                    'position' => 4
+                ]
+            ];
+        }
+        
+        return $variants;
+    }
+    
+    public function nouveautes() {
+        // Connexion à la base de données
+        require_once 'config/database.php';
+        $database = new Database();
+        $db = $database->getConnection();
+        
+        // Si la connexion échoue, rediriger vers la page d'erreur
+        if (!$db) {
+            header("Location: " . BASE_URL . "/404");
+            exit;
+        }
+        
+        try {
+            // Récupérer les produits les plus récents
+            $query = "SELECT p.*, c.name as category_name, c.slug as category_slug 
+                    FROM products p 
+                    LEFT JOIN categories c ON p.category_id = c.id 
+                    ORDER BY p.created_at DESC 
+                    LIMIT 12";
+            $stmt = $db->prepare($query);
+            $stmt->execute();
+            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            // Définir le titre de la page
+            $pageTitle = "Nouvelles Collections";
+            
+            // Afficher la vue
+            require_once 'views/templates/header.php';
+            require_once 'views/products/nouveautes.php';
+            require_once 'views/templates/footer.php';
+        } catch (Exception $e) {
+            // En cas d'erreur, rediriger vers la page 404
+            header("Location: " . BASE_URL . "/404");
+            exit;
         }
     }
 }
