@@ -1,58 +1,75 @@
 <?php
+// Point d'entrée principal de l'application
 session_start();
-// Point d'entrée principal de l'application MVC
 
-// Charger la configuration de la base de données
-require_once 'config/database.php';
+// Définir la constante BASE_URL
+define('BASE_URL', '/mgs_store');
 
-// Définir le chemin de base
-define('BASE_PATH', __DIR__);
-define('BASE_URL', 'http://localhost/mgs_store');
+// Afficher les erreurs en mode développement
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
-// Analyser l'URL pour déterminer le contrôleur et l'action
-$request = $_SERVER['REQUEST_URI'];
-$path = parse_url($request, PHP_URL_PATH);
-$path = str_replace('/mgs_store/', '', $path);
+// DEBUG: Vérifier l'état de la session du panier
+if (!isset($_SESSION['cart'])) {
+    $_SESSION['cart'] = [];
+}
 
-// Initialiser les paramètres par défaut
+// Charger les routes
+$routes = require_once 'config/routes.php';
+
+// Récupérer l'URL demandée
+$requestUri = $_SERVER['REQUEST_URI'];
+
+// Supprimer BASE_URL de l'URI
+$requestUri = str_replace(BASE_URL, '', $requestUri);
+
+// Supprimer les paramètres de requête
+$requestUri = strtok($requestUri, '?');
+
+// Supprimer le slash de début si présent
+$requestUri = ltrim($requestUri, '/');
+
+// Récupérer le contrôleur et l'action à partir des routes
+$controller = null;
+$action = null;
 $params = [];
 
-// Route par défaut
-if ($path == '' || $path == '/') {
-    $controller = 'Home';
-    $action = 'index';
-} else {
-    // Analyse des autres routes
-    $parts = explode('/', $path);
-    $controller = isset($parts[0]) && $parts[0] != '' ? ucfirst($parts[0]) : 'Home';
-    $action = isset($parts[1]) && $parts[1] != '' ? $parts[1] : 'index';
+// Rechercher la route correspondante
+foreach ($routes as $pattern => $route) {
+    // Version simplifiée et corrigée de la conversion du modèle en expression régulière
+    $regexPattern = str_replace('/', '\/', $pattern);
+    $regexPattern = preg_replace('/:([a-zA-Z0-9_]+)/', '([^\/]+)', $regexPattern);
     
-    // Paramètres supplémentaires pour les catégories
-    $params = array_slice($parts, 2);
+    // Si la route correspond
+    if (preg_match('/^' . $regexPattern . '$/', $requestUri, $matches)) {
+        $controller = $route[0];
+        $action = $route[1];
+        
+        // Récupérer les paramètres
+        array_shift($matches); // Supprimer la correspondance complète
+        $params = $matches;
+        
+        break;
+    }
 }
 
-// Charger le contrôleur approprié
-$controllerFile = 'controllers/' . $controller . 'Controller.php';
-if (file_exists($controllerFile)) {
-    require_once $controllerFile;
-    $controllerClass = $controller . 'Controller';
-    $controllerInstance = new $controllerClass();
-    
-    // Vérifier si l'action existe
-    if (method_exists($controllerInstance, $action)) {
-        // Vérifier si les paramètres sont vides avant d'appeler la fonction
-        if (!empty($params)) {
-            call_user_func_array([$controllerInstance, $action], $params);
-        } else {
-            // Appeler l'action sans paramètres si aucun n'est fourni
-            $controllerInstance->$action();
-        }
-    } else {
-        // Action non trouvée
-        require_once 'views/404.php';
-    }
-} else {
-    // Contrôleur non trouvé
-    require_once 'views/404.php';
+// Si aucune route ne correspond, utiliser la route 404
+if (!$controller) {
+    $controller = 'ErrorController';
+    $action = 'notFound';
 }
+
+// Vérifier si le fichier du contrôleur existe
+if (!file_exists('controllers/' . $controller . '.php')) {
+    error_log("Controller file not found: controllers/{$controller}.php");
+    $controller = 'ErrorController';
+    $action = 'notFound';
+}
+
+// Charger et instancier le contrôleur
+require_once 'controllers/' . $controller . '.php';
+$controllerInstance = new $controller();
+
+// Appeler l'action avec les paramètres
+call_user_func_array([$controllerInstance, $action], $params);
 ?>

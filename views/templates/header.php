@@ -14,14 +14,11 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- AOS Animation Library -->
-    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
-    <!-- Custom Color Theme -->
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/color-theme.css?v=<?php echo time(); ?>">
-    <!-- Custom CSS with version parameter to prevent caching -->
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/style.css?v=<?php echo time(); ?>">
-    <!-- Auth Styles -->
-    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/auth-style.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/color-theme.css?v=<?php echo time(); ?>">
+    <link rel="stylesheet" href="<?php echo BASE_URL; ?>/assets/css/cart-notification.css?v=<?php echo time(); ?>">
+    
     <!-- Ajout de la variable globale BASE_URL pour JavaScript -->
     <script>
         const BASE_URL = '<?php echo BASE_URL; ?>';

@@ -6,221 +6,281 @@ class CartController {
         require_once 'config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
-        $this->initializeCart();
-    }
-
-    private function initializeCart() {
-        try {
-            $sessionId = session_id();
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-
-            // Vérifier si la table existe
-            $tables = $this->db->query("SHOW TABLES LIKE 'cart'")->fetchAll();
-            if (empty($tables)) {
-                // Si la table n'existe pas, on charge et exécute le script SQL
-                $sql = file_get_contents(__DIR__ . '/../sql/cart_tables.sql');
-                $this->db->exec($sql);
-            }
-
-            // Vérifier si un panier existe déjà
-            $query = "SELECT id FROM cart WHERE " . ($userId ? "user_id = ?" : "session_id = ?");
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            $cart = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            // Si aucun panier n'existe, en créer un nouveau
-            if (!$cart) {
-                $query = "INSERT INTO cart (user_id, session_id) VALUES (?, ?)";
-                $stmt = $this->db->prepare($query);
-                $stmt->execute([$userId, $sessionId]);
-            }
-        } catch (PDOException $e) {
-            error_log("Erreur lors de l'initialisation du panier: " . $e->getMessage());
+        
+        // Initialiser le panier s'il n'existe pas
+        if (!isset($_SESSION['cart'])) {
+            $_SESSION['cart'] = [];
         }
+        
+        // Pour le débogage - ajoutez ceci temporairement
+        error_log('SESSION CART: ' . print_r($_SESSION['cart'], true));
     }
-
+    
+    // Affiche le contenu du panier
     public function index() {
-        $pageTitle = "Mon panier";
-        $cartItems = $this->getCartItems();
-        $total = $this->calculateTotal($cartItems);
+        $pageTitle = "Votre panier";
+        $cart = $this->getCart();
         
         require_once 'views/templates/header.php';
         require_once 'views/cart/index.php';
         require_once 'views/templates/footer.php';
     }
-
-    public function add() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $productId = $_POST['product_id'] ?? 0;
-            $quantity = $_POST['quantity'] ?? 1;
-            
-            $this->addToCart($productId, $quantity);
-            
-            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-                // Obtenir le nombre total d'articles dans le panier
-                $cartCount = $this->getCartItemCount();
-                echo json_encode(['success' => true, 'cartCount' => $cartCount]);
-                exit;
+    
+    // Ajoute un produit au panier
+    public function add($productId) {
+        // Log pour le débogage
+        error_log('Adding product ID: ' . $productId . ' to cart');
+        
+        $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+        
+        if ($quantity <= 0) {
+            $quantity = 1;
+        }
+        
+        // Récupérer les informations du produit
+        $product = $this->getProductById($productId);
+        
+        if (!$product) {
+            // Produit non trouvé
+            $_SESSION['error_message'] = "Produit non trouvé.";
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        // Vérifier le stock disponible
+        if ($product['stock'] < $quantity) {
+            $_SESSION['error_message'] = "Stock insuffisant. Seulement " . $product['stock'] . " disponible(s).";
+            header("Location: " . BASE_URL . "/product/detail/" . $productId);
+            exit;
+        }
+        
+        // Calculer le prix avec remise s'il y a lieu
+        $price = $product['price'];
+        if (!empty($product['discount'])) {
+            $price = $price * (1 - ($product['discount'] / 100));
+        }
+        
+        // Vérifier si le produit est déjà dans le panier
+        $found = false;
+        
+        // S'assurer que $_SESSION['cart'] est un tableau
+        if (!is_array($_SESSION['cart'])) {
+            $_SESSION['cart'] = [];
+        }
+        
+        foreach ($_SESSION['cart'] as &$item) {
+            if ($item['id'] == $productId) {
+                // Mettre à jour la quantité
+                $item['quantity'] += $quantity;
+                $found = true;
+                break;
             }
-            
-            header('Location: ' . BASE_URL . '/cart');
+        }
+        
+        if (!$found) {
+            // Ajouter le produit au panier
+            $_SESSION['cart'][] = [
+                'id' => $productId,
+                'name' => $product['name'],
+                'price' => $price,
+                'quantity' => $quantity,
+                'image' => $product['image'],
+                'stock' => $product['stock'] // Ajouter cette information pour les vérifications ultérieures
+            ];
+        }
+        
+        // Message de confirmation
+        $_SESSION['success_message'] = "Produit ajouté au panier avec succès!";
+        
+        // Log pour le débogage
+        error_log('Updated cart: ' . print_r($_SESSION['cart'], true));
+        
+        // Redirection en fonction du contexte (AJAX ou non)
+        if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+            // Requête AJAX - retourner un JSON
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Produit ajouté au panier',
+                'cart_count' => $this->getCartItemCount(),
+                'cart' => $_SESSION['cart'] // Pour le débogage
+            ]);
+            exit;
+        } else {
+            // Requête normale - rediriger
+            header("Location: " . BASE_URL . "/cart");
             exit;
         }
     }
     
-    private function addToCart($productId, $quantity) {
-        try {
-            // Vérifier si le produit existe
-            $query = "SELECT id FROM products WHERE id = ?";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$productId]);
-            
-            if (!$stmt->fetch()) {
-                return false; // Le produit n'existe pas
-            }
-            
-            // Récupérer le panier actuel
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-            $sessionId = session_id();
-            
-            $query = "SELECT id FROM cart WHERE " . ($userId ? "user_id = ?" : "session_id = ?");
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            $cart = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if (!$cart) {
-                // Créer un nouveau panier si nécessaire
-                $query = "INSERT INTO cart (user_id, session_id) VALUES (?, ?)";
-                $stmt = $this->db->prepare($query);
-                $stmt->execute([$userId, $sessionId]);
-                $cartId = $this->db->lastInsertId();
-            } else {
-                $cartId = $cart['id'];
-            }
-            
-            // Vérifier si le produit est déjà dans le panier
-            $query = "SELECT id, quantity FROM cart_items WHERE cart_id = ? AND product_id = ?";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$cartId, $productId]);
-            $cartItem = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            if ($cartItem) {
-                // Mettre à jour la quantité si le produit est déjà dans le panier
-                $newQuantity = $cartItem['quantity'] + $quantity;
-                $query = "UPDATE cart_items SET quantity = ? WHERE id = ?";
-                $stmt = $this->db->prepare($query);
-                $stmt->execute([$newQuantity, $cartItem['id']]);
-            } else {
-                // Ajouter le produit au panier
-                $query = "INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)";
-                $stmt = $this->db->prepare($query);
-                $stmt->execute([$cartId, $productId, $quantity]);
-            }
-            
-            return true;
-        } catch (PDOException $e) {
-            error_log("Erreur lors de l'ajout au panier: " . $e->getMessage());
-            return false;
+    // Met à jour la quantité d'un produit dans le panier
+    public function update($productId) {
+        $quantity = isset($_POST['quantity']) ? intval($_POST['quantity']) : 1;
+        
+        if ($quantity <= 0) {
+            // Si la quantité est 0 ou négative, supprimer le produit
+            return $this->remove($productId);
         }
+        
+        // Vérifier le stock disponible
+        $product = $this->getProductById($productId);
+        
+        if (!$product) {
+            $_SESSION['error_message'] = "Produit non trouvé.";
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        if ($product['stock'] < $quantity) {
+            $_SESSION['error_message'] = "Stock insuffisant. Seulement " . $product['stock'] . " disponible(s).";
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        // Mettre à jour la quantité
+        foreach ($_SESSION['cart'] as &$item) {
+            if ($item['id'] == $productId) {
+                $item['quantity'] = $quantity;
+                break;
+            }
+        }
+        
+        // Message de confirmation
+        $_SESSION['success_message'] = "Panier mis à jour avec succès!";
+        
+        // Redirection
+        header("Location: " . BASE_URL . "/cart");
+        exit;
     }
-
-    // Méthode publique pour obtenir le nombre d'articles dans le panier
+    
+    // Supprime un produit du panier
+    public function remove($productId) {
+        if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
+            $_SESSION['cart'] = [];
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        foreach ($_SESSION['cart'] as $key => $item) {
+            if ($item['id'] == $productId) {
+                unset($_SESSION['cart'][$key]);
+                break;
+            }
+        }
+        
+        // Réindexer le tableau
+        $_SESSION['cart'] = array_values($_SESSION['cart']);
+        
+        // Message de confirmation
+        $_SESSION['success_message'] = "Produit retiré du panier avec succès!";
+        
+        // Redirection
+        header("Location: " . BASE_URL . "/cart");
+        exit;
+    }
+    
+    // Vide le panier
+    public function clear() {
+        $_SESSION['cart'] = [];
+        
+        // Message de confirmation
+        $_SESSION['success_message'] = "Votre panier a été vidé.";
+        
+        // Redirection
+        header("Location: " . BASE_URL . "/cart");
+        exit;
+    }
+    
+    // Récupère le nombre d'articles dans le panier
     public function getCartItemCount() {
-        try {
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-            $sessionId = session_id();
-            
-            $query = "SELECT SUM(ci.quantity) as total
-                     FROM cart_items ci
-                     JOIN cart c ON ci.cart_id = c.id
-                     WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
-            
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
-            
-            return (int) ($result['total'] ?? 0);
-        } catch (PDOException $e) {
-            error_log("Erreur lors du calcul du nombre d'articles dans le panier: " . $e->getMessage());
+        if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
             return 0;
         }
+        
+        $count = 0;
+        
+        foreach ($_SESSION['cart'] as $item) {
+            $count += $item['quantity'];
+        }
+        
+        return $count;
     }
     
-    public function update() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data = json_decode(file_get_contents('php://input'), true);
-            $itemId = $data['itemId'] ?? 0;
-            $quantity = $data['quantity'] ?? 1;
-            
-            $success = $this->updateCartItem($itemId, $quantity);
-            
-            header('Content-Type: application/json');
-            echo json_encode(['success' => $success]);
-            exit;
+    // Récupère le contenu complet du panier
+    // Changé de private à public pour permettre l'accès depuis d'autres contrôleurs
+    public function getCart() {
+        if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
+            $_SESSION['cart'] = [];
         }
-    }
-
-    public function remove() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $data = json_decode(file_get_contents('php://input'), true);
-            $itemId = $data['itemId'] ?? 0;
-            
-            $success = $this->removeCartItem($itemId);
-            
-            header('Content-Type: application/json');
-            echo json_encode(['success' => $success]);
-            exit;
+        
+        $cart = [
+            'items' => $_SESSION['cart'],
+            'subtotal' => 0,
+            'shipping' => 0,
+            'total' => 0
+        ];
+        
+        // Calculer le sous-total
+        foreach ($cart['items'] as $item) {
+            $cart['subtotal'] += $item['price'] * $item['quantity'];
         }
+        
+        // Calculer les frais d'expédition (par exemple, gratuit au-dessus de 50€)
+        $cart['shipping'] = ($cart['subtotal'] >= 50) ? 0 : 4.99;
+        
+        // Calculer le total
+        $cart['total'] = $cart['subtotal'] + $cart['shipping'];
+        
+        return $cart;
     }
-
-    private function updateCartItem($itemId, $quantity) {
+    
+    // Récupère les informations d'un produit
+    private function getProductById($productId) {
         try {
-            $query = "UPDATE cart_items SET quantity = ? WHERE id = ?";
+            $query = "SELECT * FROM products WHERE id = ?";
             $stmt = $this->db->prepare($query);
-            $stmt->execute([$quantity, $itemId]);
-            return true;
+            $stmt->execute([$productId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            error_log("Erreur lors de la mise à jour du panier: " . $e->getMessage());
+            error_log("Erreur lors de la récupération du produit: " . $e->getMessage());
             return false;
         }
     }
 
-    private function removeCartItem($itemId) {
-        try {
-            $query = "DELETE FROM cart_items WHERE id = ?";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$itemId]);
-            return true;
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la suppression d'un article du panier: " . $e->getMessage());
-            return false;
+    // Vérifie si le panier est valide avant le checkout
+    public function validateForCheckout() {
+        $cart = $this->getCart();
+        $isValid = true;
+        $errorMessages = [];
+        
+        // Vérifier si le panier est vide
+        if (empty($cart['items'])) {
+            return [
+                'valid' => false,
+                'errors' => ["Votre panier est vide. Ajoutez des produits avant de passer à la caisse."]
+            ];
         }
-    }
-
-    private function getCartItems() {
-        try {
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-            $sessionId = session_id();
+        
+        // Vérifier les stocks pour chaque produit
+        foreach ($cart['items'] as $item) {
+            $currentProduct = $this->getProductById($item['id']);
             
-            $query = "SELECT ci.*, p.name, p.price, p.image 
-                    FROM cart_items ci
-                    JOIN cart c ON ci.cart_id = c.id
-                    JOIN products p ON ci.product_id = p.id
-                    WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
-
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            // En cas d'erreur, retourner un tableau vide
-            error_log("Erreur lors de la récupération du panier: " . $e->getMessage());
-            return [];
+            if (!$currentProduct) {
+                $isValid = false;
+                $errorMessages[] = "Un produit dans votre panier n'est plus disponible.";
+                continue;
+            }
+            
+            if ($currentProduct['stock'] < $item['quantity']) {
+                $isValid = false;
+                $errorMessages[] = "Stock insuffisant pour '{$item['name']}'. Seulement {$currentProduct['stock']} disponible(s).";
+            }
         }
-    }
-
-    private function calculateTotal($items) {
-        return array_reduce($items, function($total, $item) {
-            return $total + ($item['price'] * $item['quantity']);
-        }, 0);
+        
+        return [
+            'valid' => $isValid,
+            'errors' => $errorMessages
+        ];
     }
 }
+?>

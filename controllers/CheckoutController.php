@@ -6,25 +6,47 @@ class CheckoutController {
         require_once 'config/database.php';
         $database = new Database();
         $this->db = $database->getConnection();
+        
+        // Initialiser le panier s'il n'existe pas
+        if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
+            $_SESSION['cart'] = [];
+        }
     }
-
+    
+    // Affiche la page de paiement
     public function index() {
-        // Include the CartController class
-        require_once 'controllers/CartController.php';
-        
-        // Vérifier si le panier est vide
-        $cartController = new CartController();
-        $cartItems = $this->getCartItems();
-        
-        if (empty($cartItems)) {
-            header('Location: ' . BASE_URL . '/cart');
+        // Vérifier si l'utilisateur est connecté
+        if (!isset($_SESSION['user'])) {
+            // Enregistrer l'URL actuelle pour rediriger après connexion
+            $_SESSION['redirect_after_login'] = BASE_URL . "/checkout";
+            
+            // Rediriger vers la page de connexion
+            $_SESSION['info_message'] = "Veuillez vous connecter ou vous inscrire pour continuer vos achats.";
+            header("Location: " . BASE_URL . "/auth/login");
             exit;
         }
-
-        $total = $this->calculateTotal($cartItems);
-        $shipping = $total >= 50 ? 0 : 4.99;
-        $grandTotal = $total + $shipping;
         
+        // Récupérer le panier
+        require_once 'controllers/CartController.php';
+        $cartController = new CartController();
+        
+        // Valider le panier
+        $validation = $cartController->validateForCheckout();
+        if (!$validation['valid']) {
+            // Stocker les erreurs et rediriger vers le panier
+            foreach ($validation['errors'] as $error) {
+                $_SESSION['error_message'] = $error;
+            }
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        $cart = $cartController->getCart(); // Maintenant cette méthode est accessible car elle est publique
+        
+        // Récupérer les informations de l'utilisateur
+        $user = $_SESSION['user'];
+        
+        // Passer les variables à la vue
         $pageTitle = "Paiement";
         
         require_once 'views/templates/header.php';
@@ -32,50 +54,134 @@ class CheckoutController {
         require_once 'views/templates/footer.php';
     }
     
+    // Traite la commande
     public function process() {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $paymentMethod = $_POST['payment_method'] ?? '';
-            $cartItems = $this->getCartItems();
-            
-            if (empty($cartItems)) {
-                header('Location: ' . BASE_URL . '/cart');
-                exit;
-            }
-            
-            $total = $this->calculateTotal($cartItems);
-            $shipping = $total >= 50 ? 0 : 4.99;
-            $grandTotal = $total + $shipping;
-            
-            // Dans une application réelle, nous traiterions ici le paiement
-            // par exemple en intégrant Stripe, PayPal, etc.
-            
-            // Pour l'exemple, simulons un paiement réussi
-            $orderId = $this->createOrder($grandTotal, $paymentMethod);
-            
-            if ($orderId) {
-                // Rediriger vers la page de confirmation
-                header('Location: ' . BASE_URL . '/checkout/confirmation/' . $orderId);
-                exit;
-            } else {
-                // Rediriger en cas d'échec avec message d'erreur
-                $_SESSION['checkout_error'] = "Une erreur est survenue lors du traitement de votre commande.";
-                header('Location: ' . BASE_URL . '/checkout');
-                exit;
-            }
-        }
-    }
-    
-    public function confirmation($orderId = null) {
-        if (!$orderId) {
-            header('Location: ' . BASE_URL . '/cart');
+        // Vérifier si l'utilisateur est connecté
+        if (!isset($_SESSION['user'])) {
+            header("Location: " . BASE_URL . "/auth/login");
             exit;
         }
         
-        // Récupérer les informations de la commande
+        // Vérifier si le panier est vide
+        if (empty($_SESSION['cart'])) {
+            $_SESSION['error_message'] = "Votre panier est vide.";
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        // Vérifier la méthode de la requête
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header("Location: " . BASE_URL . "/checkout");
+            exit;
+        }
+        
+        // Récupérer le panier
+        require_once 'controllers/CartController.php';
+        $cartController = new CartController();
+        $cart = $cartController->getCart();
+        
+        // Valider le panier avant de traiter la commande
+        $validation = $cartController->validateForCheckout();
+        if (!$validation['valid']) {
+            foreach ($validation['errors'] as $error) {
+                $_SESSION['error_message'] = $error;
+            }
+            header("Location: " . BASE_URL . "/cart");
+            exit;
+        }
+        
+        // Récupérer les données du formulaire
+        $shippingAddress = isset($_POST['same_address']) ? $_POST['billing_address'] : $_POST['shipping_address'];
+        $shippingCity = isset($_POST['same_address']) ? $_POST['billing_city'] : $_POST['shipping_city'];
+        $shippingPostalCode = isset($_POST['same_address']) ? $_POST['billing_postal_code'] : $_POST['shipping_postal_code'];
+        $shippingCountry = isset($_POST['same_address']) ? $_POST['billing_country'] : $_POST['shipping_country'];
+        
+        $paymentMethod = $_POST['payment_method'] ?? '';
+        
+        // Vérifier la méthode de paiement
+        if (!in_array($paymentMethod, ['credit_card', 'paypal'])) {
+            $_SESSION['error_message'] = "Méthode de paiement invalide.";
+            header("Location: " . BASE_URL . "/checkout");
+            exit;
+        }
+        
+        // Valider le paiement (simulé pour cet exemple)
+        $paymentSuccessful = $this->processPayment($cart['total'], $paymentMethod);
+        
+        if (!$paymentSuccessful) {
+            $_SESSION['error_message'] = "Le paiement a échoué. Veuillez réessayer.";
+            header("Location: " . BASE_URL . "/checkout");
+            exit;
+        }
+        
+        // Créer la commande
+        try {
+            // Générer un numéro de commande unique
+            $orderNumber = 'ORD' . date('YmdHis') . rand(100, 999);
+            
+            // Insérer la commande dans la base de données
+            $query = "INSERT INTO orders (user_id, order_number, total_amount, status, payment_method, shipping_address, created_at) 
+                     VALUES (?, ?, ?, 'pending', ?, ?, NOW())";
+            $stmt = $this->db->prepare($query);
+            
+            $shippingAddressComplete = $shippingAddress . ", " . $shippingPostalCode . " " . $shippingCity . ", " . $shippingCountry;
+            
+            $stmt->execute([
+                $_SESSION['user']['id'],
+                $orderNumber,
+                $cart['total'],
+                $paymentMethod,
+                $shippingAddressComplete
+            ]);
+            
+            $orderId = $this->db->lastInsertId();
+            
+            // Insérer les articles de la commande
+            foreach ($cart['items'] as $item) {
+                $query = "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)";
+                $stmt = $this->db->prepare($query);
+                $stmt->execute([$orderId, $item['id'], $item['quantity'], $item['price']]);
+                
+                // Mettre à jour le stock
+                $query = "UPDATE products SET stock = stock - ? WHERE id = ?";
+                $stmt = $this->db->prepare($query);
+                $stmt->execute([$item['quantity'], $item['id']]);
+            }
+            
+            // Créer la facture
+            require_once 'controllers/InvoiceController.php';
+            $invoiceController = new InvoiceController();
+            $invoiceController->generate($orderId);
+            
+            // Vider le panier
+            $_SESSION['cart'] = [];
+            
+            // Rediriger vers la page de confirmation
+            header("Location: " . BASE_URL . "/checkout/confirmation/" . $orderId);
+            exit;
+            
+        } catch (PDOException $e) {
+            error_log("Erreur lors de la création de la commande: " . $e->getMessage());
+            $_SESSION['error_message'] = "Une erreur est survenue lors de la création de votre commande. Veuillez réessayer.";
+            header("Location: " . BASE_URL . "/checkout");
+            exit;
+        }
+    }
+    
+    // Affiche la page de confirmation de commande
+    public function confirmation($orderId) {
+        // Vérifier si l'utilisateur est connecté
+        if (!isset($_SESSION['user'])) {
+            header("Location: " . BASE_URL . "/auth/login");
+            exit;
+        }
+        
+        // Récupérer les détails de la commande
         $order = $this->getOrderById($orderId);
         
-        if (!$order) {
-            header('Location: ' . BASE_URL . '/cart');
+        // Vérifier si la commande appartient à l'utilisateur
+        if (!$order || $order['user_id'] != $_SESSION['user']['id']) {
+            header("Location: " . BASE_URL . "/order/history");
             exit;
         }
         
@@ -86,84 +192,36 @@ class CheckoutController {
         require_once 'views/templates/footer.php';
     }
     
-    private function getCartItems() {
-        try {
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-            $sessionId = session_id();
-
-            $query = "SELECT ci.*, p.name, p.price, p.image 
-                    FROM cart_items ci
-                    JOIN cart c ON ci.cart_id = c.id
-                    JOIN products p ON ci.product_id = p.id
-                    WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
-
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la récupération du panier: " . $e->getMessage());
-            return [];
-        }
-    }
-
-    private function calculateTotal($items) {
-        return array_reduce($items, function($total, $item) {
-            return $total + ($item['price'] * $item['quantity']);
-        }, 0);
+    // Traitement du paiement (simulé pour l'exemple)
+    private function processPayment($amount, $method) {
+        // Simuler un processus de paiement
+        // Dans un environnement de production, cela serait connecté à une passerelle de paiement
+        return true; // Toujours réussir pour l'exemple
     }
     
-    private function createOrder($total, $paymentMethod) {
-        try {
-            $userId = isset($_SESSION['user']) ? $_SESSION['user']['id'] : null;
-            $sessionId = session_id();
-            
-            // Insérer la commande
-            $query = "INSERT INTO orders (user_id, total_amount, status, payment_method, created_at) 
-                      VALUES (?, ?, ?, ?, NOW())";
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId, $total, 'pending', $paymentMethod]);
-            
-            $orderId = $this->db->lastInsertId();
-            
-            // Récupérer les articles du panier
-            $cartQuery = "SELECT ci.*, p.price FROM cart_items ci
-                         JOIN cart c ON ci.cart_id = c.id
-                         JOIN products p ON ci.product_id = p.id
-                         WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
-            $cartStmt = $this->db->prepare($cartQuery);
-            $cartStmt->execute([$userId ?? $sessionId]);
-            $cartItems = $cartStmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Insérer les articles dans la commande
-            foreach ($cartItems as $item) {
-                $query = "INSERT INTO order_items (order_id, product_id, quantity, price) 
-                          VALUES (?, ?, ?, ?)";
-                $stmt = $this->db->prepare($query);
-                $stmt->execute([$orderId, $item['product_id'], $item['quantity'], $item['price']]);
-            }
-            
-            // Vider le panier
-            $query = "DELETE ci FROM cart_items ci 
-                      JOIN cart c ON ci.cart_id = c.id 
-                      WHERE " . ($userId ? "c.user_id = ?" : "c.session_id = ?");
-            $stmt = $this->db->prepare($query);
-            $stmt->execute([$userId ?? $sessionId]);
-            
-            return $orderId;
-        } catch (PDOException $e) {
-            error_log("Erreur lors de la création de la commande: " . $e->getMessage());
-            return false;
-        }
-    }
-    
+    // Récupère une commande par son ID
     private function getOrderById($orderId) {
         try {
-            $query = "SELECT o.*, u.username, u.email FROM orders o 
-                      LEFT JOIN users u ON o.user_id = u.id 
+            $query = "SELECT o.*, u.first_name, u.last_name, u.email 
+                      FROM orders o 
+                      JOIN users u ON o.user_id = u.id 
                       WHERE o.id = ?";
             $stmt = $this->db->prepare($query);
             $stmt->execute([$orderId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC);
+            $order = $stmt->fetch(PDO::FETCH_ASSOC);
+            
+            if ($order) {
+                // Récupérer les articles de la commande
+                $query = "SELECT oi.*, p.name, p.image 
+                          FROM order_items oi 
+                          JOIN products p ON oi.product_id = p.id 
+                          WHERE oi.order_id = ?";
+                $stmt = $this->db->prepare($query);
+                $stmt->execute([$orderId]);
+                $order['items'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+            
+            return $order;
         } catch (PDOException $e) {
             error_log("Erreur lors de la récupération de la commande: " . $e->getMessage());
             return false;

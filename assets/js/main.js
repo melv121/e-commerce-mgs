@@ -1,6 +1,5 @@
 /**
- * MGS Sport - Main JavaScript File
- * Design sportif inspiré par Nike et autres grandes marques
+ * Fichier JavaScript principal pour MGS Store
  */
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -355,6 +354,170 @@ document.addEventListener('DOMContentLoaded', function() {
                 }, 1000);
             }
         });
+    });
+    
+    // Animation pour les icônes
+    const animatedIcons = document.querySelectorAll('.animated-icon');
+    
+    animatedIcons.forEach(icon => {
+        icon.addEventListener('mouseenter', function() {
+            this.classList.add('fa-beat');
+        });
+        
+        icon.addEventListener('mouseleave', function() {
+            this.classList.remove('fa-beat');
+        });
+    });
+    
+    // Formulaire d'ajout au panier (AJAX)
+    const addToCartForms = document.querySelectorAll('.add-to-cart-form');
+    
+    addToCartForms.forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const productId = this.getAttribute('data-product-id');
+            const url = BASE_URL + '/cart/add/' + productId;
+            
+            fetch(url, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Mettre à jour le nombre d'articles dans le panier
+                    updateCartCount(data.cart_count);
+                    
+                    // Afficher une notification
+                    showCartNotification('Produit ajouté au panier avec succès!');
+                    
+                    // Animation du bouton panier
+                    const cartIcon = document.querySelector('.cart-icon');
+                    if (cartIcon) {
+                        cartIcon.classList.add('cart-pulse');
+                        setTimeout(() => {
+                            cartIcon.classList.remove('cart-pulse');
+                        }, 1000);
+                    }
+                } else {
+                    showCartNotification('Erreur: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                showCartNotification('Une erreur est survenue.', 'error');
+            });
+        });
+    });
+    
+    // Mettre à jour le compteur du panier
+    function updateCartCount(count) {
+        const cartCounter = document.querySelector('.cart-counter');
+        if (cartCounter) {
+            cartCounter.textContent = count;
+            cartCounter.style.display = count > 0 ? 'block' : 'none';
+        }
+    }
+    
+    // Afficher une notification d'ajout au panier
+    function showCartNotification(message, type = 'success') {
+        const notification = document.createElement('div');
+        notification.className = 'cart-notification ' + (type === 'success' ? 'success' : 'error');
+        
+        notification.innerHTML = `
+            <div class="notification-content">
+                <div class="notification-icon">
+                    <i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'}"></i>
+                </div>
+                <div class="notification-text">
+                    <p>${message}</p>
+                </div>
+            </div>
+            ${type === 'success' ? `
+            <div class="notification-actions">
+                <a href="${BASE_URL}/cart" class="btn btn-sm btn-primary">Voir le panier</a>
+                <button class="btn btn-sm btn-secondary close-notification">Continuer mes achats</button>
+            </div>
+            ` : ''}
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Afficher la notification avec une animation
+        setTimeout(() => {
+            notification.classList.add('active');
+        }, 10);
+        
+        // Ajouter gestionnaire d'événements pour fermer la notification
+        const closeBtn = notification.querySelector('.close-notification');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                notification.classList.remove('active');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            });
+        }
+        
+        // Fermer automatiquement après 5 secondes
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                notification.classList.remove('active');
+                setTimeout(() => {
+                    if (document.body.contains(notification)) {
+                        notification.remove();
+                    }
+                }, 300);
+            }
+        }, 5000);
+    }
+    
+    // Initialiser les éléments qui doivent apparaître en fondu
+    const fadeElements = document.querySelectorAll('.fade-in-element');
+    if (fadeElements.length > 0) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1 });
+        
+        fadeElements.forEach(element => {
+            observer.observe(element);
+        });
+    }
+    
+    // Sticky navbar
+    const navbar = document.querySelector('.navbar');
+    if (navbar) {
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+    }
+    
+    // Initialiser les formulaires avec validation
+    const forms = document.querySelectorAll('.needs-validation');
+    
+    forms.forEach(form => {
+        form.addEventListener('submit', function(event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            
+            form.classList.add('was-validated');
+        }, false);
     });
 });
 

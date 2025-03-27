@@ -1,68 +1,109 @@
 <div class="container py-5">
-    <h1 class="mb-4">Mon Panier</h1>
-
-    <?php if (empty($cartItems)): ?>
+    <h1 class="mb-4">Votre panier</h1>
+    
+    <?php if (isset($_SESSION['error_message'])): ?>
+        <div class="alert alert-danger">
+            <?php echo $_SESSION['error_message']; ?>
+        </div>
+        <?php unset($_SESSION['error_message']); ?>
+    <?php endif; ?>
+    
+    <?php if (isset($_SESSION['success_message'])): ?>
+        <div class="alert alert-success">
+            <?php echo $_SESSION['success_message']; ?>
+        </div>
+        <?php unset($_SESSION['success_message']); ?>
+    <?php endif; ?>
+    
+    <?php
+    // Débogage pour afficher l'état de la session directement dans la page
+    if (!isset($_SESSION['cart']) || !is_array($_SESSION['cart'])) {
+        echo '<div class="alert alert-warning">Problème détecté avec la session du panier. Réinitialisation...</div>';
+        $_SESSION['cart'] = [];
+    }
+    ?>
+    
+    <?php if (empty($cart['items'])): ?>
         <div class="alert alert-info">
-            Votre panier est vide. <a href="<?php echo BASE_URL; ?>">Continuez vos achats</a>
+            <p>Votre panier est vide.</p>
+            <a href="<?php echo BASE_URL; ?>" class="btn btn-primary mt-3">Continuer mes achats</a>
         </div>
     <?php else: ?>
         <div class="row">
             <div class="col-lg-8">
-                <div class="card">
+                <div class="card mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Articles dans votre panier (<?php echo count($cart['items']); ?>)</h5>
+                    </div>
                     <div class="card-body">
-                        <?php 
-                        // Index pour suivre les éléments du panier
-                        $itemCount = count($cartItems);
-                        $index = 0;
-                        
-                        foreach ($cartItems as $item): 
-                            $index++;
-                            $isLast = ($index === $itemCount);
-                        ?>
-                            <div class="cart-item d-flex align-items-center mb-4">
-                                <img src="<?php echo BASE_URL . '/' . $item['image']; ?>" alt="<?php echo $item['name']; ?>" class="cart-item-image" style="width: 100px; height: 100px; object-fit: cover;">
-                                <div class="ms-3 flex-grow-1">
-                                    <h5 class="mb-1"><?php echo $item['name']; ?></h5>
-                                    <p class="text-muted mb-0">Prix unitaire: <?php echo number_format($item['price'], 2, ',', ' '); ?> €</p>
-                                    <div class="quantity-selector mt-2">
-                                        <button class="btn btn-sm btn-outline-secondary quantity-btn" data-action="decrease" data-item-id="<?php echo $item['id']; ?>">-</button>
-                                        <input type="number" class="form-control form-control-sm d-inline-block mx-2 text-center" style="width: 60px;" value="<?php echo $item['quantity']; ?>" min="1" max="99">
-                                        <button class="btn btn-sm btn-outline-secondary quantity-btn" data-action="increase" data-item-id="<?php echo $item['id']; ?>">+</button>
+                        <?php foreach ($cart['items'] as $item): ?>
+                            <div class="row mb-4">
+                                <div class="col-md-2 col-4">
+                                    <img src="<?php echo BASE_URL . '/' . $item['image']; ?>" alt="<?php echo $item['name']; ?>" class="img-fluid rounded">
+                                </div>
+                                <div class="col-md-10 col-8">
+                                    <div class="d-flex justify-content-between">
+                                        <div>
+                                            <h5 class="mb-2"><?php echo $item['name']; ?></h5>
+                                            <p class="mb-2 text-muted">Prix unitaire: <?php echo number_format($item['price'], 2, ',', ' '); ?> €</p>
+                                            <form action="<?php echo BASE_URL; ?>/cart/update/<?php echo $item['id']; ?>" method="post" class="d-flex align-items-center">
+                                                <div class="input-group input-group-sm" style="width: 120px;">
+                                                    <button class="btn btn-outline-secondary quantity-btn" type="button" data-action="decrease">-</button>
+                                                    <input type="number" class="form-control text-center quantity-input" name="quantity" value="<?php echo $item['quantity']; ?>" min="1" max="99">
+                                                    <button class="btn btn-outline-secondary quantity-btn" type="button" data-action="increase">+</button>
+                                                </div>
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary ms-2 update-btn">Mettre à jour</button>
+                                            </form>
+                                        </div>
+                                        <div class="text-end">
+                                            <p class="h5 mb-3"><?php echo number_format($item['price'] * $item['quantity'], 2, ',', ' '); ?> €</p>
+                                            <a href="<?php echo BASE_URL; ?>/cart/remove/<?php echo $item['id']; ?>" class="text-danger remove-item">
+                                                <i class="fas fa-trash"></i> Supprimer
+                                            </a>
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="ms-auto">
-                                    <p class="h5 mb-0"><?php echo number_format($item['price'] * $item['quantity'], 2, ',', ' '); ?> €</p>
-                                    <button class="btn btn-link text-danger mt-2 remove-item" data-item-id="<?php echo $item['id']; ?>">
-                                        <i class="fas fa-trash"></i> Supprimer
-                                    </button>
-                                </div>
+                                <hr class="my-3">
                             </div>
-                            <?php if (!$isLast): ?>
-                                <hr>
-                            <?php endif; ?>
                         <?php endforeach; ?>
+                        <div class="d-flex justify-content-between">
+                            <a href="<?php echo BASE_URL; ?>" class="btn btn-outline-secondary">
+                                <i class="fas fa-arrow-left me-2"></i>Continuer mes achats
+                            </a>
+                            <a href="<?php echo BASE_URL; ?>/cart/clear" class="btn btn-outline-danger">
+                                <i class="fas fa-trash me-2"></i>Vider le panier
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-4">
                 <div class="card">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">Récapitulatif</h5>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Récapitulatif</h5>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Sous-total</span>
-                            <span><?php echo number_format($total, 2, ',', ' '); ?> €</span>
+                            <span><?php echo number_format($cart['subtotal'], 2, ',', ' '); ?> €</span>
                         </div>
                         <div class="d-flex justify-content-between mb-2">
                             <span>Livraison</span>
-                            <span><?php echo $total >= 50 ? 'Gratuite' : '4,99 €'; ?></span>
+                            <span>
+                                <?php if ($cart['shipping'] > 0): ?>
+                                    <?php echo number_format($cart['shipping'], 2, ',', ' '); ?> €
+                                <?php else: ?>
+                                    Gratuit
+                                <?php endif; ?>
+                            </span>
                         </div>
                         <hr>
-                        <div class="d-flex justify-content-between mb-3">
-                            <strong>Total</strong>
-                            <strong><?php echo number_format($total >= 50 ? $total : $total + 4.99, 2, ',', ' '); ?> €</strong>
+                        <div class="d-flex justify-content-between mb-4">
+                            <span class="h5">Total</span>
+                            <span class="h5"><?php echo number_format($cart['total'], 2, ',', ' '); ?> €</span>
                         </div>
-                        <a href="<?php echo BASE_URL; ?>/checkout" class="btn btn-primary w-100">
-                            Procéder au paiement
+                        <a href="<?php echo BASE_URL; ?>/checkout" class="btn btn-primary w-100 py-3">
+                            <i class="fas fa-credit-card me-2"></i> Valider ma commande
                         </a>
                     </div>
                 </div>
@@ -73,64 +114,44 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Gestion des quantités
-    document.querySelectorAll('.quantity-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const action = this.dataset.action;
-            const itemId = this.dataset.itemId;
-            const input = this.parentElement.querySelector('input');
+    // Gestion des boutons de quantité
+    const quantityBtns = document.querySelectorAll('.quantity-btn');
+    
+    quantityBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const action = this.getAttribute('data-action');
+            const input = this.closest('.input-group').querySelector('.quantity-input');
+            const updateBtn = this.closest('form').querySelector('.update-btn');
+            
             let value = parseInt(input.value);
-
+            
             if (action === 'increase') {
-                value = Math.min(value + 1, 99);
-            } else {
-                value = Math.max(value - 1, 1);
+                if (value < 99) {
+                    value++;
+                }
+            } else if (action === 'decrease') {
+                if (value > 1) {
+                    value--;
+                }
             }
-
+            
             input.value = value;
-            updateCartItem(itemId, value);
+            
+            // Ajouter une classe pour indiquer que la quantité a changé
+            updateBtn.classList.add('btn-primary');
+            updateBtn.classList.remove('btn-outline-secondary');
         });
     });
-
-    // Suppression d'articles
-    document.querySelectorAll('.remove-item').forEach(button => {
-        button.addEventListener('click', function() {
-            if (confirm('Voulez-vous vraiment supprimer cet article ?')) {
-                removeCartItem(this.dataset.itemId);
+    
+    // Confirmation de suppression
+    const removeLinks = document.querySelectorAll('.remove-item');
+    
+    removeLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer cet article du panier ?')) {
+                e.preventDefault();
             }
         });
     });
 });
-
-function updateCartItem(itemId, quantity) {
-    fetch(`${BASE_URL}/cart/update`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ itemId, quantity })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
-
-function removeCartItem(itemId) {
-    fetch(`${BASE_URL}/cart/remove`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ itemId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            location.reload();
-        }
-    });
-}
 </script>
