@@ -128,7 +128,6 @@
                     <?php endif; ?>
                 </ul>
                 <div class="d-flex nav-icons">
-                    <a href="#" class="text-dark me-3" data-bs-toggle="modal" data-bs-target="#searchModal"><i class="fas fa-search"></i></a>
                     <a href="#" class="text-dark me-3" id="userIcon" data-bs-toggle="modal" data-bs-target="#authModal"><i class="fas fa-user"></i></a>
                     <a href="<?php echo BASE_URL; ?>/cart" class="text-dark position-relative">
                         <i class="fas fa-shopping-cart"></i>

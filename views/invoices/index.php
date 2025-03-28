@@ -32,7 +32,7 @@
                         <div class="alert alert-info">
                             <p><i class="fas fa-info-circle me-2"></i> Certaines de vos commandes n'ont pas encore de facture associée.</p>
                             <a href="<?php echo BASE_URL; ?>/repair-invoices.php" class="btn btn-sm btn-primary mt-2">
-                                <i class="fas fa-sync-alt me-2"></i> Générer les factures manquantes
+                                <i class="fas fa-sync-alt me-2"></i> Générer les factures
                             </a>
                         </div>
                     <?php endif; ?>
@@ -41,7 +41,7 @@
                         <div class="alert alert-info">
                             Vous n'avez pas encore de factures.
                             <?php if (isset($hasOrdersWithoutInvoices) && $hasOrdersWithoutInvoices): ?>
-                                <p class="mt-2">Utilisez le bouton ci-dessus pour générer les factures pour vos commandes existantes.</p>
+                                <p class="mt-2">Utilisez le bouton ci-dessus pour créer les factures pour vos commandes existantes.</p>
                             <?php endif; ?>
                         </div>
                     <?php else: ?>
@@ -64,12 +64,7 @@
                                             <td><?php echo date('d/m/Y', strtotime($invoice['created_at'])); ?></td>
                                             <td><?php echo number_format($invoice['amount'], 2, ',', ' '); ?> €</td>
                                             <td>
-                                                <a href="<?php echo BASE_URL; ?>/invoice/view/<?php echo $invoice['id']; ?>" class="btn btn-sm btn-primary">
-                                                    <i class="fas fa-eye"></i> Voir
-                                                </a>
-                                                <a href="<?php echo BASE_URL; ?>/invoice/download/<?php echo $invoice['id']; ?>" class="btn btn-sm btn-secondary">
-                                                    <i class="fas fa-download"></i> Télécharger
-                                                </a>
+                                               
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
