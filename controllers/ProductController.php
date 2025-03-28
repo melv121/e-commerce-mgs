@@ -387,6 +387,15 @@ class ProductController {
         }
     }
     
+    public function nouveautes() {
+        $pageTitle = "Nouveautés";
+        $products = $this->getNewProducts();
+        
+        require_once 'views/templates/header.php';
+        require_once 'views/products/nouveautes.php';
+        require_once 'views/templates/footer.php';
+    }
+
     public function promotions() {
         $pageTitle = "Promotions";
         $products = $this->getPromotionalProducts();
@@ -973,43 +982,6 @@ class ProductController {
         }
         
         return $variants;
-    }
-    
-    public function nouveautes() {
-        // Connexion à la base de données
-        require_once 'config/database.php';
-        $database = new Database();
-        $db = $database->getConnection();
-        
-        // Si la connexion échoue, rediriger vers la page d'erreur
-        if (!$db) {
-            header("Location: " . BASE_URL . "/404");
-            exit;
-        }
-        
-        try {
-            // Récupérer les produits les plus récents
-            $query = "SELECT p.*, c.name as category_name, c.slug as category_slug 
-                    FROM products p 
-                    LEFT JOIN categories c ON p.category_id = c.id 
-                    ORDER BY p.created_at DESC 
-                    LIMIT 12";
-            $stmt = $db->prepare($query);
-            $stmt->execute();
-            $products = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Définir le titre de la page
-            $pageTitle = "Nouvelles Collections";
-            
-            // Afficher la vue
-            require_once 'views/templates/header.php';
-            require_once 'views/products/nouveautes.php';
-            require_once 'views/templates/footer.php';
-        } catch (Exception $e) {
-            // En cas d'erreur, rediriger vers la page 404
-            header("Location: " . BASE_URL . "/404");
-            exit;
-        }
     }
 }
 ?>

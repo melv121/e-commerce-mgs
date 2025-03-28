@@ -1,15 +1,18 @@
 # Activation du module de réécriture d'URL
 <IfModule mod_rewrite.c>
+    # Activer le moteur de réécriture
     RewriteEngine On
+    
+    # Définir la base pour la réécriture (dossier d'installation)
     RewriteBase /mgs_store/
     
-    # Ne pas appliquer la règle aux fichiers et répertoires existants
+    # Ne pas appliquer de réécriture pour les fichiers et dossiers existants
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     
-    # Rediriger toutes les requêtes vers index.php
+    # Réécrire toutes les autres requêtes vers index.php
     RewriteRule ^(.*)$ index.php [QSA,L]
 </IfModule>
 
-# Gestion des erreurs
-ErrorDocument 404 /mgs_store/404.php
+# Gestion des erreurs (optionnel)
+ErrorDocument 404 /mgs_store/404

@@ -2,13 +2,12 @@
 class ErrorController {
     
     public function notFound() {
-        // Définir le code de statut HTTP 404
-        http_response_code(404);
-        
-        // Définir le titre de la page
         $pageTitle = "Page non trouvée";
         
-        // Afficher la vue d'erreur 404
+        // Définir le code de statut HTTP 404
+        header("HTTP/1.0 404 Not Found");
+        
+        // Charger la vue 404
         require_once 'views/templates/header.php';
         require_once 'views/errors/404.php';
         require_once 'views/templates/footer.php';

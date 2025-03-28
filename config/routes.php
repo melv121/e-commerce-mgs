@@ -1,8 +1,8 @@
 <?php
-// Configuration des routes de l'application
+// Définition des routes de l'application
 
+// Route par défaut (page d'accueil)
 $routes = [
-    // Page d'accueil
     '' => ['HomeController', 'index'],
     'home' => ['HomeController', 'index'],
     
@@ -10,7 +10,7 @@ $routes = [
     'product/category' => ['ProductController', 'category'],
     'product/category/:slug' => ['ProductController', 'category'],
     'product/category/:category/:subcategory' => ['ProductController', 'category'],
-    'product/detail/:id' => ['ProductController', 'detail'],
+    'product/detail/:id' => ['ProductController', 'detail'],  // Route critique pour les détails du produit
     'product/nouveautes' => ['ProductController', 'nouveautes'],
     'product/promotions' => ['ProductController', 'promotions'],
     
